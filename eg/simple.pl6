@@ -4,16 +4,10 @@ use DB::Pg;
 
 my $pg = DB::Pg.new;
 
-my $db = $pg.db;
-
-prompt('now');
-
-try say $db.query("select 'foobar'").value;
-
-say $!.perl;
-
-$db.finish;
-
+for $pg.cursor("select * from generate_series(1,10) as val", :hash, :finish) -> $row
+{
+    say $row;
+}
 
 say "done";
 

@@ -174,7 +174,7 @@ class DB::Pg::Error::FatalError is DB::Pg::Error {}    # Not really Fatal..
 
 class DB::Pg::Results
 {
-    has $.finishflag = False;
+    has Bool $.finishflag = False;
     has $.sth handles <row rows columns types finish>;
 
     method value
@@ -197,12 +197,18 @@ class DB::Pg::Results
 
     method arrays
     {
-        gather { while $!sth.row(finish => $!finishflag) -> $_ { .take } }
+        gather
+        {
+            while $!sth.row(finish => $!finishflag) -> $_ { .take }
+        }
     }
 
     method hashes
     {
-        gather { while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take } }
+        gather
+        {
+            while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take }
+        }
     }
 }
 
@@ -226,6 +232,7 @@ class DB::Pg::Statement
     {
         .clear with $!result;
         $!result = PGresult;
+        $!rows = 0;
         $!db.finish;
     }
 
@@ -245,7 +252,7 @@ class DB::Pg::Statement
         $hash ?? %(@!columns Z=> @row) !! @row
     }
 
-    method execute(*@args, Bool :$finish)
+    method execute(*@args, Bool :$finish = False)
     {
         my @params := CArray[Str].new;
 
@@ -364,7 +371,7 @@ class DB::Pg::Database
 
         return $_ with %!prepare-cache{$query};
 
-        my $name = "statement-{$!counter++}";
+        my $name = "statement_{$!counter++}";
 
         my $result = self.error-check: $!conn.prepare($name, $query, 0, Nil);
 
@@ -387,7 +394,7 @@ class DB::Pg::Database
                                                         :@types);
     }
 
-    method execute(Str $command, :$finish)
+    method execute(Str $command, Bool :$finish = False)
     {
         try
         {
@@ -410,7 +417,7 @@ class DB::Pg::Database
         self
     }
 
-    method query(Str $query, *@args, :$finish)
+    method query(Str $query, *@args, Bool :$finish = False)
     {
         try
         {
@@ -448,6 +455,75 @@ class DB::Pg::Database
         self.execute('rollback');
         $!transaction = False;
         self
+    }
+
+    my class DB::Pg::CursorIterator does Iterator
+    {
+        has $.sth;
+        has $.name;
+        has $.hash;
+        has $.finish;
+
+        method pull-one
+        {
+            try
+            {
+                if $!sth.rows
+                {
+                    my $row = $!sth.row(:$!hash);
+                    return $row if $row.elems;
+                    $!sth.execute;
+                    return self.pull-one;
+                }
+                else
+                {
+                    $!sth.db.execute("close $!name");
+                    if $!finish
+                    {
+                        $!sth.db.commit;
+                        $!sth.finish
+                    }
+                    return IterationEnd
+                }
+                CATCH
+                {
+                    when DB::Pg::Error::EmptyQuery |
+                         DB::Pg::Error::FatalError
+                    {
+                        $!sth.finish if $!finish;
+                        .throw;
+                    }
+                }
+            }
+        }
+    }
+
+    method cursor(Str $query, *@args, Bool :$finish = False, Bool :$hash = False,
+                  Int :$fetch = 1000)
+    {
+        try
+        {
+            self.begin if !$!transaction;
+
+            my $name = "cursor_{$!counter++}";
+            self.query("declare $name cursor for $query", |@args);
+
+            my $sth = self.prepare("fetch $fetch from $name");
+            $sth.execute;
+
+            return Seq.new: DB::Pg::CursorIterator.new(:$sth, :$name,
+                                                       :$hash, :$finish);
+
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery |
+                     DB::Pg::Error::FatalError
+                 {
+                     self.finish if $finish;
+                     .throw;
+                }
+            }
+        }
     }
 }
 
@@ -498,9 +574,14 @@ class DB::Pg
         self.db.execute($command, :finish);
     }
 
-    method query(Str $query, *@args)
+    method query(|c)
     {
-        self.db.query($query, |@args, :finish)
+        self.db.query(|c, :finish)
+    }
+
+    method cursor(|c)
+    {
+        self.db.cursor(|c, :finish);
     }
 
     method finish
