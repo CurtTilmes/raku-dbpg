@@ -170,7 +170,7 @@ class DB::Pg::Error is Exception
 class DB::Pg::Error::EmptyQuery is DB::Pg::Error {}
 class DB::Pg::Error::BadResponse is DB::Pg::Error {}
 class DB::Pg::Error::BadConnection is DB::Pg::Error {}
-class DB::Pg::Error::FatalError is DB::Pg::Error {}
+class DB::Pg::Error::FatalError is DB::Pg::Error {}    # Not really Fatal..
 
 class DB::Pg::Results
 {
@@ -299,20 +299,29 @@ class DB::Pg::Statement
 
 class DB::Pg::Database
 {
-    has PGconn $.conn;
+    has PGconn $.conn handles<status>;
     has $.dbpg;
     has %.prepare-cache;
     has $!counter = 0;
     has Bool $!active = True;
     has $!transaction = False;
 
-    method DESTROY { .finish with $!conn }
+    method DESTROY
+    {
+        %!prepare-cache = ();
+        .finish with $!conn;
+        $!active = False;
+    }
 
     method active { $!active = True; self }
 
     method finish
     {
-        if $!active
+        if $!conn.status == CONNECTION_BAD
+        {
+            self.DESTROY
+        }
+        elsif $!active
         {
             if $!transaction
             {
@@ -446,36 +455,41 @@ class DB::Pg
 {
     has $.conninfo = '';
     has @.connections;
-    has $.lock = Lock.new;
+    has $!lock = Lock.new;
 
     method db(--> DB::Pg::Database)
     {
-        my ($db, $conn);
+        $!lock.protect:
+        {
+            while @!connections.elems
+            {
+                my $db = @!connections.pop;
 
-        $!lock.protect: { $db = @!connections.pop if @!connections.elems }
+                return $db.active if $db.status == CONNECTION_OK;
 
-        say "Cached conn $db.conn.socket()" with $db;
-
-        return .active with $db;
+                $db.DESTROY;
+            }
+        }
 
         loop
         {
-            $conn = PGconn.new($!conninfo);
-            last if $conn;
-            note $conn.error-message;  # Only loop on bad connection
-            sleep 2;
+            my $conn = PGconn.new($!conninfo);
+
+            die DB::Pg::Error(message => "Can't create connection") unless $conn;
+
+            return DB::Pg::Database.new(conn => $conn, dbpg => self)
+                if $conn.status == CONNECTION_OK;
+
+            note $conn.error-message;
+
+            $conn.finish;
+
+            sleep 3;
         }
-
-#        $conn.trace('/dev/stderr');
-
-        say "New connection $conn.socket()";
-
-        DB::Pg::Database.new(conn => $conn, dbpg => self)
     }
 
     method cache(DB::Pg::Database:D $db)
     {
-        say "Caching $db.conn.socket()";
         $!lock.protect: { @!connections.push($db) }
     }
 
