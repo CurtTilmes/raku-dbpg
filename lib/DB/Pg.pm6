@@ -1,7 +1,5 @@
 use NativeCall;
 
-my atomicint $counter = 0;
-
 constant LIB = 'pq';  # libpq.so
 
 enum ConnStatusType <
@@ -170,54 +168,53 @@ class PGconn is repr('CPointer')
     method escape-identifier(Str $str, size_t $length --> Str)
         is native(LIB) is symbol('PQescapeIdentifier') {}
 
+    method PQtrace(Pointer $debug_port)
+        is native(LIB) {}
+
+    sub fopen(Str $path, Str $mode --> Pointer)
+        is native {}
+
+    method trace(Str $path)
+    {
+        self.PQtrace(fopen($path, 'a'))
+    }
+
+    method untrace()
+        is native(LIB) is symbol('PQuntrace') {}
 }
 
 class DB::Pg::Results
 {
-    has $.db;
-    has $.sth;
+    has $.finishflag = False;
+    has $.sth handles <row rows columns types finish>;
 
     method value
     {
-        LEAVE .finish with $!db;
+        LEAVE self.finish if $!finishflag;
         $!sth.row()[0]
     }
 
     method array
     {
-        LEAVE .finish with $!db;
+        LEAVE self.finish if $!finishflag;
         $!sth.row
     }
 
     method hash
     {
-        LEAVE .finish with $!db;
+        LEAVE self.finish if $!finishflag;
         $!sth.row(:hash)
     }
 
     method arrays
     {
-        Seq.new(Rakudo::Iterator.FirstNThenSinkAll(
-                    $!sth.iterator, $!sth.rows,
-                    { .finish with $!db }))
+        gather { while $!sth.row(finish => $!finishflag) -> $_ { .take } }
     }
 
     method hashes
     {
-        Seq.new(Rakudo::Iterator.FirstNThenSinkAll(
-                    $!sth.iterator(:hash), $!sth.rows,
-                    { .finish with $!db }))
+        gather { while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take } }
     }
-}
-
-class DB::Pg::Iterator does Iterator
-{
-    has $.sth;
-    has $.hash;
-
-    method pull-one { $!sth.row(:$!hash) }
-
-    method sink-all {}
 }
 
 class DB::Pg::Statement
@@ -228,19 +225,26 @@ class DB::Pg::Statement
     has @.columns;
     has @.types;
     has PGresult $.result;
-    has Int $.row;
     has Int $.rows;
+    has Int $!row;
 
-    method iterator(Bool :$hash)
+    method DESTROY
     {
-        DB::Pg::Iterator.new(sth => self, :$hash)
+        .clear with $!result;
     }
 
-    method row(Bool :$hash)
+    method finish
     {
-        return () unless $!row < $!rows;
+        .clear with $!result;
+        $!result = PGresult;
+        $!db.finish;
+    }
 
-        LEAVE $!row++;
+    method row(Bool :$hash, Bool :$finish)
+    {
+        LEAVE { self.finish if (++$!row == $!rows) && $finish }
+
+        (return $hash ?? {} !! ()) unless $!row < $!rows;
 
         my @row = do for ^@!columns.elems Z @!types -> [$col, $type]
         {
@@ -267,12 +271,10 @@ class DB::Pg::Statement
 
         with $!result { .clear; $!result = PGresult }
 
-        $!rows = 0;
-        $!row = 0;
+        $!row = $!rows = 0;
+
         my $result = $!db.conn.exec-prepared($!name, @params.elems, @params,
                                              Nil, Nil, 0);
-
-        say "$!db.conn.socket() $result.status()";
 
         given $result.status
         {
@@ -283,11 +285,12 @@ class DB::Pg::Statement
             when PGRES_TUPLES_OK {
                 $!result = $result;
                 $!rows = $result.tuples;
-                DB::Pg::Results.new(sth => self, db => $finish ?? $!db !! Nil);
+                DB::Pg::Results.new(sth => self, finishflag => $finish)
             }
             when PGRES_COMMAND_OK {
                 $result.clear;
                 self.finish if $finish;
+                $!db;
             }
             when PGRES_FATAL_ERROR {
                 fail $!db.conn.error-message;
@@ -302,19 +305,38 @@ class DB::Pg::Database
     has PGconn $.conn;
     has $.dbpg;
     has %.prepare-cache;
-    has $.prepare-lock = Lock.new;
+    has $!counter = 0;
+    has Bool $!active = True;
+    has $!transaction = False;
+
+    method DESTROY
+    {
+        .finish with $!conn;
+    }
+
+    method active { $!active = True; self }
 
     method finish
     {
-        say "$*THREAD.id() database finished $!conn.socket()";
-        $!dbpg.return(self);
+        if $!active
+        {
+            if $!transaction
+            {
+                self.rollback;
+                $!transaction = False;
+            }
+            $!active = False;
+            $!dbpg.cache(self);
+        }
     }
 
     method prepare(Str $query --> DB::Pg::Statement)
     {
-        return $_ with %!prepare-cache{$!conn.socket}{$query};
+        die "Not active" unless $!active;
 
-        my $name = "pg-$!conn.socket()-{$counter⚛++}";
+        return $_ with %!prepare-cache{$query};
+
+        my $name = "statement-{$!counter++}";
 
         my $result = $!conn.prepare($name, $query, 0, Nil);
 
@@ -340,23 +362,36 @@ class DB::Pg::Database
         my @types = (^$result.fields).
             map({ %oid-to-type{$result.field-type($_)} });
 
-        my $prepared = DB::Pg::Statement.new(:db(self), :$name,
-                                             :@paramtypes, :@columns,
-                                             :@types);
-
-        $!prepare-lock.protect: {
-            %!prepare-cache{$!conn.socket}{$query} = $prepared;
-        }
+        %!prepare-cache{$query} = DB::Pg::Statement.new(:db(self), :$name,
+                                                        :@paramtypes, :@columns,
+                                                        :@types);
     }
 
-    method do(Str $query, *@args, :$finish)
+    method query(Str $query, *@args, :$finish)
     {
         self.prepare($query).execute(|@args, :$finish);
     }
 
-    method async(Str $query, *@args)
+    method begin
     {
-        
+        self.query('begin');
+        $!transaction = True;
+        self
+    }
+
+    method commit
+    {
+        die "Not in a transaction" unless $!transaction;
+        self.query('commit');
+        $!transaction = False;
+        self
+    }
+
+    method rollback
+    {
+        self.query('rollback');
+        $!transaction = False;
+        self
     }
 }
 
@@ -372,30 +407,44 @@ class DB::Pg
 
         $!lock.protect: { $db = @!connections.pop if @!connections.elems }
 
-        return $_ with $db;
+        say "Cached conn $db.conn.socket()" with $db;
+
+        return .active with $db;
 
         loop
         {
-            say "$*THREAD.id() Making new database connection";
             $conn = PGconn.new($!conninfo);
             last if $conn;
-            note $conn.error-message;
+            note $conn.error-message;  # Only loop on bad connection
             sleep 2;
         }
 
-        say "$*THREAD.id() Made connection $conn.socket()";
+        $conn.trace('/dev/stderr');
+
+        say "New connection $conn.socket()";
 
         DB::Pg::Database.new(conn => $conn, dbpg => self)
     }
 
-    method return(DB::Pg::Database:D $db)
+    method cache(DB::Pg::Database:D $db)
     {
-        say "$*THREAD.id() returning $db.conn.socket()";
+        say "Caching $db.conn.socket()";
         $!lock.protect: { @!connections.push($db) }
     }
 
-    method do(Str $query, *@args)
+    method query(Str $query, *@args)
     {
-        self.db.prepare($query).execute(|@args, :finish);
+        self.db.query($query, |@args, :finish);
+    }
+
+    method finish
+    {
+        .DESTROY for @!connections;
+        @!connections = ();
+    }
+
+    method DESTROY
+    {
+        self.finish if @!connections;
     }
 }
