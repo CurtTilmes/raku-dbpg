@@ -5,21 +5,6 @@ constant LIB = 'pq';  # libpq.so
 enum ConnStatusType <
     CONNECTION_OK
     CONNECTION_BAD
-    CONNECTION_STARTED
-    CONNECTION_MADE
-    CONNECTION_AWAITING_RESPONSE
-    CONNECTION_AUTH_OK
-    CONNECTION_SETENV
-    CONNECTION_SSL_STARTUP
-    CONNECTION_NEEDED
->;
-
-enum PGTransactionStatusType <
-    PQTRANS_IDLE
-    PQTRANS_ACTIVE
-    PQTRANS_INTRANS
-    PQTRANS_INERROR
-    PQTRANS_UNKNOWN
 >;
 
 enum ExecStatusType <
@@ -133,12 +118,6 @@ class PGconn is repr('CPointer')
 
     method status(--> ConnStatusType) { ConnStatusType(self.PQstatus) }
 
-    method PQtransactionStatus(--> int32)
-    is native(LIB) {}
-
-    method transaction-status(--> PGTransactionStatusType)
-        { PGTransactionStatusType(self.PQtransactionStatus) }
-
     method error-message(--> Str)
         is native(LIB) is symbol('PQerrorMessage') {}
 
@@ -182,6 +161,16 @@ class PGconn is repr('CPointer')
     method untrace()
         is native(LIB) is symbol('PQuntrace') {}
 }
+
+class DB::Pg::Error is Exception
+{
+    has $.message;
+}
+
+class DB::Pg::Error::EmptyQuery is DB::Pg::Error {}
+class DB::Pg::Error::BadResponse is DB::Pg::Error {}
+class DB::Pg::Error::BadConnection is DB::Pg::Error {}
+class DB::Pg::Error::FatalError is DB::Pg::Error {}
 
 class DB::Pg::Results
 {
@@ -273,29 +262,37 @@ class DB::Pg::Statement
 
         $!row = $!rows = 0;
 
-        my $result = $!db.conn.exec-prepared($!name, @params.elems, @params,
-                                             Nil, Nil, 0);
-
-        given $result.status
+        try
         {
-            when PGRES_EMPTY_QUERY {
-                $result.clear;
-                fail "Empty Query";
+            my $result = $!db.error-check:
+                $!db.conn.exec-prepared($!name, @params.elems, @params,
+                                        Nil, Nil, 0);
+
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
+                {
+                    self.finish if $finish;
+                    .throw
+                }
             }
-            when PGRES_TUPLES_OK {
-                $!result = $result;
-                $!rows = $result.tuples;
-                DB::Pg::Results.new(sth => self, finishflag => $finish)
+
+            given $result.status
+            {
+                when PGRES_TUPLES_OK
+                {
+                    $!result = $result;
+                    $!rows = $result.tuples;
+                    DB::Pg::Results.new(sth => self, finishflag => $finish)
+                }
+                when PGRES_COMMAND_OK
+                {
+                    $result.clear;
+                    self.finish if $finish;
+                    $!db
+                }
+                default { ... }
             }
-            when PGRES_COMMAND_OK {
-                $result.clear;
-                self.finish if $finish;
-                $!db;
-            }
-            when PGRES_FATAL_ERROR {
-                fail $!db.conn.error-message;
-            }
-            default { ... }
         }
     }
 }
@@ -309,10 +306,7 @@ class DB::Pg::Database
     has Bool $!active = True;
     has $!transaction = False;
 
-    method DESTROY
-    {
-        .finish with $!conn;
-    }
+    method DESTROY { .finish with $!conn }
 
     method active { $!active = True; self }
 
@@ -330,6 +324,31 @@ class DB::Pg::Database
         }
     }
 
+    multi method error-check(PGresult:U $result)
+    {
+        die DB::Pg::Error(message => $!conn.error-message);
+    }
+
+    multi method error-check(PGresult:D $result)
+    {
+        given $result.status
+        {
+            when PGRES_EMPTY_QUERY {
+                $result.clear;
+                die DB::Pg::Error::EmptyQuery.new(message => 'Empty Query')
+            }
+            when PGRES_FATAL_ERROR {
+                $result.clear;
+                die DB::Pg::Error::FatalError.new(
+                    message => $!conn.error-message)
+            }
+            when PGRES_COMMAND_OK|PGRES_TUPLES_OK {
+                $result
+            }
+            default {...}
+        }
+    }
+
     method prepare(Str $query --> DB::Pg::Statement)
     {
         die "Not active" unless $!active;
@@ -338,21 +357,11 @@ class DB::Pg::Database
 
         my $name = "statement-{$!counter++}";
 
-        my $result = $!conn.prepare($name, $query, 0, Nil);
+        my $result = self.error-check: $!conn.prepare($name, $query, 0, Nil);
 
-        unless $result && $result.status == PGRES_COMMAND_OK
-        {
-            .clear with $result;
-            die $!conn.error-message;
-        }
+        $result.clear;
 
-        $result = $!conn.describe-prepared($name);
-
-        unless $result && $result.status == PGRES_COMMAND_OK
-        {
-            .clear with $result;
-            die $!conn.error-message;
-        }
+        $result = self.error-check: $!conn.describe-prepared($name);
 
         my @paramtypes = (^$result.params)
             .map({ %oid-to-type{$result.param-type($_)} });
@@ -362,19 +371,57 @@ class DB::Pg::Database
         my @types = (^$result.fields).
             map({ %oid-to-type{$result.field-type($_)} });
 
+        $result.clear;
+
         %!prepare-cache{$query} = DB::Pg::Statement.new(:db(self), :$name,
                                                         :@paramtypes, :@columns,
                                                         :@types);
     }
 
+    method execute(Str $command, :$finish)
+    {
+        try
+        {
+            my $result = self.error-check: $!conn.exec($command);
+            $result.clear;
+
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery |
+                     DB::Pg::Error::FatalError
+                {
+                    self.finish if $finish;
+                    .throw;
+                }
+            }
+        }
+
+        self.finish if $finish;
+
+        self
+    }
+
     method query(Str $query, *@args, :$finish)
     {
-        self.prepare($query).execute(|@args, :$finish);
+        try
+        {
+            return self.prepare($query).execute(|@args, :$finish);
+
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery |
+                     DB::Pg::Error::FatalError
+                 {
+                     self.finish if $finish;
+                     .throw;
+                }
+            }
+        }
     }
 
     method begin
     {
-        self.query('begin');
+        self.execute('begin');
         $!transaction = True;
         self
     }
@@ -382,14 +429,14 @@ class DB::Pg::Database
     method commit
     {
         die "Not in a transaction" unless $!transaction;
-        self.query('commit');
+        self.execute('commit');
         $!transaction = False;
         self
     }
 
     method rollback
     {
-        self.query('rollback');
+        self.execute('rollback');
         $!transaction = False;
         self
     }
@@ -419,7 +466,7 @@ class DB::Pg
             sleep 2;
         }
 
-        $conn.trace('/dev/stderr');
+#        $conn.trace('/dev/stderr');
 
         say "New connection $conn.socket()";
 
@@ -432,9 +479,14 @@ class DB::Pg
         $!lock.protect: { @!connections.push($db) }
     }
 
+    method execute(Str $command)
+    {
+        self.db.execute($command, :finish);
+    }
+
     method query(Str $query, *@args)
     {
-        self.db.query($query, |@args, :finish);
+        self.db.query($query, |@args, :finish)
     }
 
     method finish

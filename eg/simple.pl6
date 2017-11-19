@@ -4,11 +4,9 @@ use DB::Pg;
 
 my $pg = DB::Pg.new;
 
-$pg.db.query('insert into foo values (1)');
+say $pg.query("select 'foobar'").value;
 
-$pg.db.query('insert into foo values (2)').finish;
 
-$pg.db.query('insert into foo values (3)');
-
+say "done";
 
 say $pg.connections.elems;
