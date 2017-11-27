@@ -1,4 +1,5 @@
 use NativeCall;
+use epoll;
 
 constant LIB = 'pq';  # libpq.so
 
@@ -103,6 +104,15 @@ class PGresult is repr('CPointer')
         is native(LIB) is symbol('PQparamtype') {}
 }
 
+class PGnotify is repr('CStruct')
+{
+    has Str   $.relname;
+    has int32 $.be_pid;
+    has Str   $.extra;
+
+    method free { PQfreemem(nativecast(Pointer,self)) }
+}
+
 class PGconn is repr('CPointer')
 {
     sub PQconnectdb(Str $conninfo --> PGconn)
@@ -141,11 +151,28 @@ class PGconn is repr('CPointer')
                          int32 $resultFormat --> PGresult)
         is native(LIB) is symbol('PQexecPrepared') {}
 
-    method escape-literal(Str $str, size_t $length --> Str)
+    method consume-input(--> int32)
+        is native(LIB) is symbol('PQconsumeInput') {}
+
+    method PQescapeIdentifier(Blob $blob, size_t $length --> Pointer)
+        is native(LIB) is symbol('PQescapeIdentifier') {}
+
+    method PQescapeLiteral(Blob $blob, size_t $length --> Pointer)
         is native(LIB) is symbol('PQescapeLiteral') {}
 
-    method escape-identifier(Str $str, size_t $length --> Str)
-        is native(LIB) is symbol('PQescapeIdentifier') {}
+    method escape-literal(Str $str --> Str)
+    {
+        my $buf = $str.encode;
+        with self.PQescapeLiteral($buf, $buf.bytes)
+        {
+            LEAVE PQfreemem($_);
+            nativecast(Str, $_);
+        }
+        else
+        {
+            Nil
+        }
+    }
 
     method PQtrace(Pointer $debug_port)
         is native(LIB) {}
@@ -153,13 +180,13 @@ class PGconn is repr('CPointer')
     sub fopen(Str $path, Str $mode --> Pointer)
         is native {}
 
-    method trace(Str $path)
-    {
-        self.PQtrace(fopen($path, 'a'))
-    }
+    method trace(Str $path) { self.PQtrace(fopen($path, 'a')) }
 
     method untrace()
         is native(LIB) is symbol('PQuntrace') {}
+
+    method notifies(--> PGnotify)
+        is native(LIB) is symbol('PQnotifies') {}
 }
 
 class DB::Pg::Error is Exception
@@ -317,6 +344,7 @@ class DB::Pg::Database
     {
         %!prepare-cache = ();
         .finish with $!conn;
+        $!conn = PGconn;
         $!active = False;
     }
 
@@ -365,7 +393,7 @@ class DB::Pg::Database
         }
     }
 
-    method prepare(Str $query --> DB::Pg::Statement)
+    method prepare(Str:D $query --> DB::Pg::Statement)
     {
         die "Not active" unless $!active;
 
@@ -394,30 +422,13 @@ class DB::Pg::Database
                                                         :@types);
     }
 
-    method execute(Str $command, Bool :$finish = False)
+    method execute(Str:D $command)
     {
-        try
-        {
-            my $result = self.error-check: $!conn.exec($command);
-            $result.clear;
-
-            CATCH
-            {
-                when DB::Pg::Error::EmptyQuery |
-                     DB::Pg::Error::FatalError
-                {
-                    self.finish if $finish;
-                    .throw;
-                }
-            }
-        }
-
-        self.finish if $finish;
-
+        self.error-check($!conn.exec($command)).clear;
         self
     }
 
-    method query(Str $query, *@args, Bool :$finish = False)
+    method query(Str:D $query, *@args, Bool :$finish = False)
     {
         try
         {
@@ -455,6 +466,11 @@ class DB::Pg::Database
         self.execute('rollback');
         $!transaction = False;
         self
+    }
+
+    method notify(Str:D $channel, Str:D $extra)
+    {
+        self.query("notify $channel, $!conn.escape-literal($extra)");
     }
 
     my class DB::Pg::CursorIterator does Iterator
@@ -531,11 +547,15 @@ class DB::Pg
 {
     has $.conninfo = '';
     has @.connections;
-    has $!lock = Lock.new;
+    has $!connection-lock = Lock.new;
+
+    has $!listen-db;
+    has %!suppliers;
+    has $!supplier-lock = Lock.new;
 
     method db(--> DB::Pg::Database)
     {
-        $!lock.protect:
+        $!connection-lock.protect:
         {
             while @!connections.elems
             {
@@ -566,22 +586,73 @@ class DB::Pg
 
     method cache(DB::Pg::Database:D $db)
     {
-        $!lock.protect: { @!connections.push($db) }
+        $!connection-lock.protect: { @!connections.push($db) }
     }
 
-    method execute(Str $command)
+    method query(|args)
     {
-        self.db.execute($command, :finish);
+        self.db.query(|args, :finish)
     }
 
-    method query(|c)
+    method cursor(|args)
     {
-        self.db.query(|c, :finish)
+        self.db.cursor(|args, :finish)
     }
 
-    method cursor(|c)
+    method execute(Str:D $command)
     {
-        self.db.cursor(|c, :finish);
+        my $db = self.db;
+        LEAVE .finish with $db;
+        $db.execute($command)
+    }
+
+    method notify(Str:D $channel, Str:D $extra)
+    {
+        my $db = self.db;
+        LEAVE .finish with $db;
+        $db.notify($channel, $extra)
+    }
+
+    method listen-loop
+    {
+        $!listen-db = self.db;
+        my $epoll = epoll.new.add($!listen-db.conn.socket, :in);
+        start
+        {
+            loop
+            {
+                last unless %!suppliers;
+                $!listen-db.conn.consume-input;
+                while $!listen-db.conn.notifies -> $notify
+                {
+                    .emit($notify.extra) with %!suppliers{$notify.relname};
+                    $notify.free;
+                }
+                last unless %!suppliers;
+                $epoll.wait;
+            }
+            $epoll.DESTROY;
+            $!listen-db.finish;
+            $!listen-db = Nil;
+        }
+    }
+
+    method listen(Str:D $channel)
+    {
+        return $_ with %!suppliers{$channel};
+        $!supplier-lock.protect: { %!suppliers{$channel} = Supplier.new }
+        self.listen-loop unless $!listen-db;
+        $!listen-db.execute("listen $channel");
+        %!suppliers{$channel}
+    }
+
+    method unlisten(Str:D $channel)
+    {
+        return unless $!listen-db && %!suppliers{$channel};
+        $!listen-db.execute("unlisten $channel");
+        %!suppliers{$channel}.done;
+        $!supplier-lock.protect: { %!suppliers{$channel}:delete }
+        $!listen-db.execute('select 1');
     }
 
     method finish
