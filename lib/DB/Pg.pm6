@@ -38,30 +38,39 @@ constant %oid-to-type = Map.new(
        701  => Num,   # float8
        705  => Any,   # unknown
        790  => Str,   # money
-      1000  => Bool,  # _bool
-      1001  => Buf,   # _bytea
+      1000  => Array[Bool],    # _bool
+      1001  => Array[Buf],     # _bytea
       1005  => Array[Int],     # Array(int2)
       1007  => Array[Int],     # Array(int4)
       1009  => Array[Str],     # Array(text)
-      1015  => Str,            # _varchar
-      1021  => Array[Num],     # Array(float4)
-      1022  => Array[Num],     # Array(float4)
+      1014  => Array[Str],     # _bpchar
+      1015  => Array[Str],     # _varchar
+      1016  => Array[Int],     # _int8
+      1021  => Array[Num],     # _float4
+      1022  => Array[Num],     # _float8
       1028  => Array[Int],     # Array<oid>
       1042  => Str,            # char(bpchar)
       1043  => Str,            # varchar
       1082  => Date,           # date
       1083  => Str,            # time
-      1114  => DateTime,       # Timestamp
+      1114  => DateTime,       # timestamp
+      1115  => Array[DateTime], # _timestamp
+      1182  => Array[Date],    # _date
+      1183  => Array[Str],     # _time
       1184  => DateTime,       # Timestamp with time zone
-      1186  => Duration,       # interval
+      1186  => Str,            # interval
+      1187  => Array[Str],     # _interval
+      1231  => Array[Num],     # _numeric
       1263  => Array[Str],     # Array<varchar>
-      1700  => Rat,   # numeric
-      2950  => Str,   # uuid
-      2951  => Str,   # _uuid
+      1700  => Num,            # numeric
+      2950  => Str,            # uuid
+      2951  => Array[Str],     # _uuid
 );
 
 sub PQlibVersion(-->uint32) is native(LIB) {}
 sub PQfreemem(Pointer) is native(LIB) {}
+sub PQunescapeBytea(Str $from, size_t $to_length is rw --> Pointer)
+    is native(LIB) {}
 
 class PGresult is repr('CPointer')
 {
@@ -133,6 +142,19 @@ class PGconn is repr('CPointer')
 
     method error-message(--> Str)
         is native(LIB) is symbol('PQerrorMessage') {}
+
+    method PQescapeByteaConn(Blob $from, size_t $from_length,
+                             size_t $to_length is rw --> Pointer)
+        is native(LIB) {}
+
+    method escape-bytea(Blob:D $buf)
+    {
+        my size_t $bytes;
+        my $ptr = self.PQescapeByteaConn($buf, $buf.bytes, $bytes)
+                  // die "Out of Memory";
+        LEAVE PQfreemem($_) with $ptr;
+        nativecast(Str, $ptr)
+    }
 
     method get-result(--> PGresult)
         is native(LIB) is symbol('PQgetResult') {}
@@ -254,6 +276,93 @@ class DB::Pg::Results
     }
 }
 
+my grammar ArrayGrammar {
+    rule TOP         { ^ <array> $ }
+    rule array       { '{' ~ '}' <element>+ %% ',' }
+    rule element     { <array> | <number> | <quoted> | <string> | <null>}
+    token number     { <[+-]>? \d* '.' \d+ [ e <[+-]>?  \d+ ]? }
+    token quoted     { '"' ~ '"' (<-["]>*) }
+    token string     { \w+ }
+    token null       { NULL }
+};
+
+my class ArrayActions
+{
+    has $.type;
+    has $.converter;
+
+    method TOP($/)
+    {
+        make $<array>.made
+    }
+
+    method array($/)
+    {
+        make $<element>».made
+    }
+
+    method element($/)
+    {
+        make $<array>.made // $<number>.made // $<quoted>.made //
+            $<string>.made // $<null>.made
+    }
+
+    method number($/)
+    {
+        make $!converter.convert($!type, $/)
+    }
+
+    method quoted($/)
+    {
+        make $!converter.convert($!type, ~$/[0]);
+    }
+
+    method string($/)
+    {
+        make $!converter.convert($!type, ~$/)
+    }
+
+    method null($/)
+    {
+        make $!type;
+    }
+}
+
+class DB::Pg::TypeConverter
+{
+    multi method convert(Str:U, $value)    { $value }
+
+    multi method convert(Bool:U, $value)   { $value eq 't' }
+
+    multi method convert(Int:U, $value)    { $value.Int }
+
+    multi method convert(Num:U, $value)      { $value.Num }
+
+    multi method convert(Date:U, $value)     { Date.new($value) }
+
+    multi method convert(DateTime:U, $value)
+    {
+        DateTime.new($value.split(' ').join('T'))
+    }
+
+    multi method convert(Buf:U, $value)
+    {
+        my size_t $bytes;
+        my $ptr = PQunescapeBytea($value, $bytes) // die "Out of Memory";
+        LEAVE PQfreemem($_) with $ptr;
+        Buf.new(nativecast(CArray[uint8], $ptr)[0 ..^ $bytes])
+    }
+
+    multi method convert(Array:U $type, $value)
+    {
+        my $actions = ArrayActions.new(type => $type.of, converter => self);
+
+        ArrayGrammar.parse($value, :$actions) // die "Failed to parse array";
+
+        $/.made
+    }
+}
+
 class DB::Pg::Statement
 {
     has $.db;
@@ -288,7 +397,8 @@ class DB::Pg::Statement
         {
             $!result.getisnull($!row, $col)
                 ?? $type
-                !! $!result.getvalue($!row, $col)
+                !! $!db.dbpg.converter.convert($type,
+                                               $!result.getvalue($!row, $col))
         }
 
         $hash ?? %(@!columns Z=> @row) !! @row
@@ -303,6 +413,11 @@ class DB::Pg::Statement
             @params[$k] = !$v.defined ?? Str !!
                 (given @!paramtypes[$k]
                 {
+                    when Buf
+                    {
+                        $!db.conn.escape-bytea($v ~~ Blob ?? $v !! ~$v.encode)
+                    }
+
                     default { ~$v }
                 });
         }
@@ -428,7 +543,7 @@ class DB::Pg::Database
         my @columns = (^$result.fields).map({ $result.field-name($_) });
 
         my @types = (^$result.fields).
-            map({ %oid-to-type{$result.field-type($_)} });
+            map({ say $result.field-type($_); %oid-to-type{$result.field-type($_)} });
 
         $result.clear;
 
@@ -634,6 +749,8 @@ class DB::Pg::Database
 class DB::Pg
 {
     has $.conninfo = '';
+    has DB::Pg::TypeConverter $.converter .= new;
+
     has @.connections;
     has $!connection-lock = Lock.new;
 
