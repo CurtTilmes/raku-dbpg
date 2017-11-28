@@ -102,6 +102,9 @@ class PGresult is repr('CPointer')
 
     method param-type(int32 $param_number--> uint32)
         is native(LIB) is symbol('PQparamtype') {}
+
+    method format(int32 $column_number --> int32)
+        is native(LIB) is symbol('PQfformat') {}
 }
 
 class PGnotify is repr('CStruct')
@@ -131,6 +134,9 @@ class PGconn is repr('CPointer')
     method error-message(--> Str)
         is native(LIB) is symbol('PQerrorMessage') {}
 
+    method get-result(--> PGresult)
+        is native(LIB) is symbol('PQgetResult') {}
+
     method socket(--> int32)
         is native(LIB) is symbol('PQsocket') {}
 
@@ -150,6 +156,15 @@ class PGconn is repr('CPointer')
                          CArray[int32] $paramFormats,
                          int32 $resultFormat --> PGresult)
         is native(LIB) is symbol('PQexecPrepared') {}
+
+    method get-copy-data(Pointer $ptr is rw, int32 $async --> int32)
+        is native(LIB) is symbol('PQgetCopyData') {}
+
+    method put-copy-data(Blob $blob, int32 $nbytes --> int32)
+        is native(LIB) is symbol('PQputCopyData') {}
+
+    method put-copy-end(Str $errormsg --> int32)
+        is native(LIB) is symbol('PQputCopyEnd') {}
 
     method consume-input(--> int32)
         is native(LIB) is symbol('PQconsumeInput') {}
@@ -386,7 +401,7 @@ class DB::Pg::Database
                 die DB::Pg::Error::FatalError.new(
                     message => $!conn.error-message)
             }
-            when PGRES_COMMAND_OK|PGRES_TUPLES_OK {
+            when PGRES_COMMAND_OK|PGRES_TUPLES_OK|PGRES_COPY_OUT|PGRES_COPY_IN {
                 $result
             }
             default {...}
@@ -422,10 +437,83 @@ class DB::Pg::Database
                                                         :@types);
     }
 
-    method execute(Str:D $command)
+    my class DB::Pg::CopyOutIterator does Iterator
     {
-        self.error-check($!conn.exec($command)).clear;
+        has $.db;
+        has $.finish;
+        has $.decode;
+
+        method pull-one
+        {
+            my Pointer $ptr .= new;
+
+            given $!db.conn.get-copy-data($ptr, 0)
+            {
+                when * > 0  # Number of bytes returned
+                {
+                    LEAVE PQfreemem($ptr);
+                    my $buf = Buf.new(nativecast(CArray[uint8], $ptr)[0 ..^ $_]);
+                    $!decode ?? $buf.decode !! $buf;
+                }
+                when -1     # Complete
+                {
+                    $!db.finish if $!finish;
+                    IterationEnd
+                }
+                when -2     # Error
+                {
+                    die DB::Pg::Error(message => $!db.conn.error-message);
+                }
+            }
+        }
+    }
+
+    multi method copy-end(Str $error = Str)
+    {
+        if $!conn.put-copy-end($error) == -1
+        {
+            die DB::Pg::Error(message => $!conn.error-message);
+        }
+        self.error-check($!conn.get-result).clear;
         self
+    }
+
+    multi method copy-data(Blob:D $data)
+    {
+        if $!conn.put-copy-data($data, $data.bytes) == -1
+        {
+            die DB::Pg::Error(message => $!conn.error-message);
+        }
+        self
+    }
+
+    multi method copy-data(Str:D $data)
+    {
+        self.copy-data($data.encode);
+    }
+
+    method execute(Str:D $command, Bool :$finish = False, Bool :$decode = True)
+    {
+        my $result = self.error-check($!conn.exec($command));
+        given $result.status
+        {
+            when PGRES_COPY_OUT
+            {
+                $result.clear;
+                Seq.new: DB::Pg::CopyOutIterator.new(db => self,
+                                                     :$finish, :$decode);
+            }
+            when PGRES_COPY_IN
+            {
+                $result.clear;
+                self
+            }
+            default
+            {
+                $result.clear;
+                self.finish if $finish;
+            }
+        }
     }
 
     method query(Str:D $query, *@args, Bool :$finish = False)
@@ -468,9 +556,9 @@ class DB::Pg::Database
         self
     }
 
-    method notify(Str:D $channel, Str:D $extra)
+    method notify(Str:D $channel, Str:D $extra, Bool :$finish = False)
     {
-        self.query("notify $channel, $!conn.escape-literal($extra)");
+        self.execute("notify $channel, $!conn.escape-literal($extra)", :$finish);
     }
 
     my class DB::Pg::CursorIterator does Iterator
@@ -601,16 +689,12 @@ class DB::Pg
 
     method execute(Str:D $command)
     {
-        my $db = self.db;
-        LEAVE .finish with $db;
-        $db.execute($command)
+        self.db.execute($command, :finish)
     }
 
     method notify(Str:D $channel, Str:D $extra)
     {
-        my $db = self.db;
-        LEAVE .finish with $db;
-        $db.notify($channel, $extra)
+        self.db.notify($channel, $extra, :finish)
     }
 
     method listen-loop
