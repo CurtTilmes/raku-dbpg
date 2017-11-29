@@ -279,9 +279,9 @@ class DB::Pg::Results
 my grammar ArrayGrammar {
     rule TOP         { ^ <array> $ }
     rule array       { '{' ~ '}' <element>+ %% ',' }
-    rule element     { <array> | <number> | <quoted> | <string> | <null>}
+    rule element     { <array> | <number> | <quoted> | <string> | <null> }
     token number     { <[+-]>? \d* '.' \d+ [ e <[+-]>?  \d+ ]? }
-    token quoted     { '"' ~ '"' (<-["]>*) }
+    token quoted     { '"' ~ '"' (.*) }
     token string     { \w+ }
     token null       { NULL }
 };
@@ -330,11 +330,11 @@ my class ArrayActions
 
 class DB::Pg::TypeConverter
 {
-    multi method convert(Str:U, $value)    { $value }
+    multi method convert(Str:U, $value)      { $value }
 
-    multi method convert(Bool:U, $value)   { $value eq 't' }
+    multi method convert(Bool:U, $value)     { $value eq 't' }
 
-    multi method convert(Int:U, $value)    { $value.Int }
+    multi method convert(Int:U, $value)      { $value.Int }
 
     multi method convert(Num:U, $value)      { $value.Num }
 
@@ -360,6 +360,27 @@ class DB::Pg::TypeConverter
         ArrayGrammar.parse($value, :$actions) // die "Failed to parse array";
 
         $/.made
+    }
+
+    multi method param(Mu:U, $value)
+    {
+        ~$value
+    }
+
+    multi method param(Buf:U, Blob:D $value, :$db)
+    {
+        $db.conn.escape-bytea($value)
+    }
+
+    multi method param(Array:U $type, @value)
+    {
+        '{' ~
+        @value.map(
+        {
+            when Array   { self.param($type, $_) }
+            when Numeric { $_ }
+            default      { '"' ~ $_.subst('"', '\\"') ~ '"' }
+        }).join(',') ~ '}'
     }
 }
 
@@ -404,23 +425,33 @@ class DB::Pg::Statement
         $hash ?? %(@!columns Z=> @row) !! @row
     }
 
-    method execute(*@args, Bool :$finish = False)
+    method execute(**@args, Bool :$finish = False)
     {
         my @params := CArray[Str].new;
 
         for @args.kv -> $k, $v
         {
             @params[$k] = !$v.defined ?? Str !!
-                (given @!paramtypes[$k]
-                {
-                    when Buf
-                    {
-                        $!db.conn.escape-bytea($v ~~ Blob ?? $v !! ~$v.encode)
-                    }
+                $!db.dbpg.converter.param(@!paramtypes[$k], $v, :$!db);
 
-                    default { ~$v }
-                });
+#                (given @!paramtypes[$k]
+#                {
+#                    when Buf
+#                    {
+#                        $!db.conn.escape-bytea($v ~~ Blob ?? $v !! ~$v.encode)
+#                    }
+
+#                    when Array
+#                    {
+#                        say $v;
+#exit;
+#                    }
+
+#                    default { ~$v }
+#                });
         }
+
+        say "Got ", @params[0];
 
         with $!result { .clear; $!result = PGresult }
 
@@ -631,11 +662,11 @@ class DB::Pg::Database
         }
     }
 
-    method query(Str:D $query, *@args, Bool :$finish = False)
+    method query(Str:D $query, Bool :$finish = False, |args)
     {
         try
         {
-            return self.prepare($query).execute(|@args, :$finish);
+            return self.prepare($query).execute(|args, :$finish);
 
             CATCH
             {
