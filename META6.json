@@ -1,0 +1,30 @@
+{
+    "name" : "DB::Pg",
+
+    "version" : "0.1",
+
+    "source-url" : "https://github.com/CurtTilmes/perl6-dbpg.git",
+
+    "perl" : "6.c",
+
+    "tags" : [ "DATABASE" ],
+
+    "provides" : {
+        "DB::Pg" : "lib/DB/Pg.pm6"
+    },
+
+    "depends" : [ "NativeCall" ],
+
+    "description" : "Perl6 bindings for PostgreSQL",
+
+    "test-depends" : [ "Test", "Test::When", "Test::META" ],
+
+    "license" : "NASA-1.3",
+
+    "authors" : [ "Curt Tilmes <Curt.Tilmes@nasa.gov>" ],
+
+    "support" : {
+      "source" : "https://github.com/CurtTilmes/perl6-dbpg.git",
+      "bugtracker" : "https://github.com/CurtTilmes/perl6-dbpg/issues"
+    }
+}

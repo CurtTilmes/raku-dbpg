@@ -59,12 +59,12 @@ constant %oid-to-type = Map.new(
       1183  => Array[Str],     # _time
       1184  => DateTime,       # Timestamp with time zone
       1186  => Str,            # interval
-      1187  => Array[Str],     # _interval
-      1231  => Array[Num],     # _numeric
-      1263  => Array[Str],     # Array<varchar>
-      1700  => Num,            # numeric
-      2950  => Str,            # uuid
-      2951  => Array[Str],     # _uuid
+      1187  => Array[Str],          # _interval
+      1231  => Array[Num],          # _numeric
+      1263  => Array[Str],          # Array<varchar>
+      1700  => Num,                 # numeric
+      2950  => Str,                 # uuid
+      2951  => Array[Str],          # _uuid
 );
 
 sub PQlibVersion(-->uint32) is native(LIB) {}
@@ -261,32 +261,26 @@ class DB::Pg::Results
 
     method arrays
     {
-        gather
-        {
-            while $!sth.row(finish => $!finishflag) -> $_ { .take }
-        }
+        gather { while $!sth.row(finish => $!finishflag) -> $_ { .take } }
     }
 
     method hashes
     {
-        gather
-        {
-            while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take }
-        }
+        gather { while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take } }
     }
 }
 
-my grammar ArrayGrammar {
+grammar DB::Pg::ArrayGrammar {
     rule TOP         { ^ <array> $ }
     rule array       { '{' ~ '}' <element>+ %% ',' }
-    rule element     { <array> | <number> | <quoted> | <string> | <null> }
-    token number     { <[+-]>? \d* '.' \d+ [ e <[+-]>?  \d+ ]? }
-    token quoted     { '"' ~ '"' (.*) }
+    rule element     { <array> | <float> | <quoted> | <string> | <null> }
+    token float      { <[+-]>? \d+ ['.' \d+]? [ <[eE]> <[+-]>?  \d+ ]? }
+    token quoted     { '"' ~ '"' (<-["]>*) }
     token string     { \w+ }
     token null       { NULL }
 };
 
-my class ArrayActions
+class DB::Pg::ArrayActions
 {
     has $.type;
     has $.converter;
@@ -303,13 +297,13 @@ my class ArrayActions
 
     method element($/)
     {
-        make $<array>.made // $<number>.made // $<quoted>.made //
+        make $<array>.made // $<float>.made // $<quoted>.made //
             $<string>.made // $<null>.made
     }
 
-    method number($/)
+    method float($/)
     {
-        make $!converter.convert($!type, $/)
+        make $!converter.convert($!type, ~$/)
     }
 
     method quoted($/)
@@ -330,7 +324,7 @@ my class ArrayActions
 
 class DB::Pg::TypeConverter
 {
-    multi method convert(Str:U, $value)      { $value }
+    multi method convert(Any:U, $value)      { $value }
 
     multi method convert(Bool:U, $value)     { $value eq 't' }
 
@@ -355,9 +349,10 @@ class DB::Pg::TypeConverter
 
     multi method convert(Array:U $type, $value)
     {
-        my $actions = ArrayActions.new(type => $type.of, converter => self);
-
-        ArrayGrammar.parse($value, :$actions) // die "Failed to parse array";
+        DB::Pg::ArrayGrammar.parse($value,
+            actions => DB::Pg::ArrayActions.new(type => $type.of,
+                                                converter => self))
+            // die "Failed to parse array";
 
         $/.made
     }
@@ -433,25 +428,7 @@ class DB::Pg::Statement
         {
             @params[$k] = !$v.defined ?? Str !!
                 $!db.dbpg.converter.param(@!paramtypes[$k], $v, :$!db);
-
-#                (given @!paramtypes[$k]
-#                {
-#                    when Buf
-#                    {
-#                        $!db.conn.escape-bytea($v ~~ Blob ?? $v !! ~$v.encode)
-#                    }
-
-#                    when Array
-#                    {
-#                        say $v;
-#exit;
-#                    }
-
-#                    default { ~$v }
-#                });
         }
-
-        say "Got ", @params[0];
 
         with $!result { .clear; $!result = PGresult }
 
@@ -574,7 +551,7 @@ class DB::Pg::Database
         my @columns = (^$result.fields).map({ $result.field-name($_) });
 
         my @types = (^$result.fields).
-            map({ say $result.field-type($_); %oid-to-type{$result.field-type($_)} });
+            map({ %oid-to-type{$result.field-type($_)} });
 
         $result.clear;
 
