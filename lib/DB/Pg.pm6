@@ -1,7 +1,7 @@
 use NativeCall;
 use epoll;
 
-constant LIB = 'pq';  # libpq.so
+constant LIBPQ = 'pq';  # libpq.so
 
 enum ConnStatusType <
     CONNECTION_OK
@@ -67,53 +67,53 @@ constant %oid-to-type = Map.new(
       2951  => Array[Str],          # _uuid
 );
 
-sub PQlibVersion(-->uint32) is native(LIB) {}
-sub PQfreemem(Pointer) is native(LIB) {}
+sub PQlibVersion(-->uint32) is native(LIBPQ) {}
+sub PQfreemem(Pointer) is native(LIBPQ) {}
 sub PQunescapeBytea(Str $from, size_t $to_length is rw --> Pointer)
-    is native(LIB) {}
+    is native(LIBPQ) {}
 
 class PGresult is repr('CPointer')
 {
     method PQresultStatus(--> int32)
-        is native(LIB) {}
+        is native(LIBPQ) {}
 
     method status(--> ExecStatusType) { ExecStatusType(self.PQresultStatus) }
 
-    method error-message(--> Str) is native(LIB)
+    method error-message(--> Str) is native(LIBPQ)
         is symbol('PQresultErrorMessage') {}
 
-    method clear() is native(LIB)
+    method clear() is native(LIBPQ)
         is symbol('PQclear') {}
 
     method tuples(--> int32)
-        is native(LIB) is symbol('PQntuples') {}
+        is native(LIBPQ) is symbol('PQntuples') {}
 
     method fields(--> int32)
-        is native(LIB) is symbol('PQnfields') {}
+        is native(LIBPQ) is symbol('PQnfields') {}
 
     method field-name(int32 $column_number --> Str)
-        is native(LIB) is symbol('PQfname') {}
+        is native(LIBPQ) is symbol('PQfname') {}
 
     method field-type(int32 $column_number --> uint32)
-        is native(LIB) is symbol('PQftype') {}
+        is native(LIBPQ) is symbol('PQftype') {}
 
     method getvalue(int32 $row_number, int32 $column_number --> Str)
-        is native(LIB) is symbol('PQgetvalue') {}
+        is native(LIBPQ) is symbol('PQgetvalue') {}
 
     method getisnull(int32 $row_number, int32 $column_number --> int32)
-        is native(LIB) is symbol('PQgetisnull') {}
+        is native(LIBPQ) is symbol('PQgetisnull') {}
 
     method getlength(int32 $row_number, int32 $column_number --> int32)
-        is native(LIB) is symbol('PQgetlength') {}
+        is native(LIBPQ) is symbol('PQgetlength') {}
 
     method params(--> int32)
-        is native(LIB) is symbol('PQnparams') {}
+        is native(LIBPQ) is symbol('PQnparams') {}
 
     method param-type(int32 $param_number--> uint32)
-        is native(LIB) is symbol('PQparamtype') {}
+        is native(LIBPQ) is symbol('PQparamtype') {}
 
     method format(int32 $column_number --> int32)
-        is native(LIB) is symbol('PQfformat') {}
+        is native(LIBPQ) is symbol('PQfformat') {}
 }
 
 class PGnotify is repr('CStruct')
@@ -128,24 +128,24 @@ class PGnotify is repr('CStruct')
 class PGconn is repr('CPointer')
 {
     sub PQconnectdb(Str $conninfo --> PGconn)
-        is native(LIB) {}
+        is native(LIBPQ) {}
 
     method new(Str $conninfo = '') { PQconnectdb($conninfo ) }
 
     method finish()
-        is native(LIB) is symbol('PQfinish') {}
+        is native(LIBPQ) is symbol('PQfinish') {}
 
     method PQstatus(--> int32)
-        is native(LIB) {}
+        is native(LIBPQ) {}
 
     method status(--> ConnStatusType) { ConnStatusType(self.PQstatus) }
 
     method error-message(--> Str)
-        is native(LIB) is symbol('PQerrorMessage') {}
+        is native(LIBPQ) is symbol('PQerrorMessage') {}
 
     method PQescapeByteaConn(Blob $from, size_t $from_length,
                              size_t $to_length is rw --> Pointer)
-        is native(LIB) {}
+        is native(LIBPQ) {}
 
     method escape-bytea(Blob:D $buf)
     {
@@ -157,45 +157,45 @@ class PGconn is repr('CPointer')
     }
 
     method get-result(--> PGresult)
-        is native(LIB) is symbol('PQgetResult') {}
+        is native(LIBPQ) is symbol('PQgetResult') {}
 
     method socket(--> int32)
-        is native(LIB) is symbol('PQsocket') {}
+        is native(LIBPQ) is symbol('PQsocket') {}
 
     method prepare(Str $stmtName,Str $query,int32 $nParams,
                    CArray[uint32] $paramTypes --> PGresult)
-        is native(LIB) is symbol('PQprepare') {}
+        is native(LIBPQ) is symbol('PQprepare') {}
 
     method describe-prepared(Str $stmtName --> PGresult)
-        is native(LIB) is symbol('PQdescribePrepared') {}
+        is native(LIBPQ) is symbol('PQdescribePrepared') {}
 
     method exec(Str $command --> PGresult)
-        is native(LIB) is symbol('PQexec') {}
+        is native(LIBPQ) is symbol('PQexec') {}
 
     method exec-prepared(Str $stmtName, int32 $nParams,
                          CArray[Str] $paramValues,
                          CArray[int32] $paramLengths,
                          CArray[int32] $paramFormats,
                          int32 $resultFormat --> PGresult)
-        is native(LIB) is symbol('PQexecPrepared') {}
+        is native(LIBPQ) is symbol('PQexecPrepared') {}
 
     method get-copy-data(Pointer $ptr is rw, int32 $async --> int32)
-        is native(LIB) is symbol('PQgetCopyData') {}
+        is native(LIBPQ) is symbol('PQgetCopyData') {}
 
     method put-copy-data(Blob $blob, int32 $nbytes --> int32)
-        is native(LIB) is symbol('PQputCopyData') {}
+        is native(LIBPQ) is symbol('PQputCopyData') {}
 
     method put-copy-end(Str $errormsg --> int32)
-        is native(LIB) is symbol('PQputCopyEnd') {}
+        is native(LIBPQ) is symbol('PQputCopyEnd') {}
 
     method consume-input(--> int32)
-        is native(LIB) is symbol('PQconsumeInput') {}
+        is native(LIBPQ) is symbol('PQconsumeInput') {}
 
     method PQescapeIdentifier(Blob $blob, size_t $length --> Pointer)
-        is native(LIB) is symbol('PQescapeIdentifier') {}
+        is native(LIBPQ) is symbol('PQescapeIdentifier') {}
 
     method PQescapeLiteral(Blob $blob, size_t $length --> Pointer)
-        is native(LIB) is symbol('PQescapeLiteral') {}
+        is native(LIBPQ) is symbol('PQescapeLiteral') {}
 
     method escape-literal(Str $str --> Str)
     {
@@ -212,7 +212,7 @@ class PGconn is repr('CPointer')
     }
 
     method PQtrace(Pointer $debug_port)
-        is native(LIB) {}
+        is native(LIBPQ) {}
 
     sub fopen(Str $path, Str $mode --> Pointer)
         is native {}
@@ -220,10 +220,10 @@ class PGconn is repr('CPointer')
     method trace(Str $path) { self.PQtrace(fopen($path, 'a')) }
 
     method untrace()
-        is native(LIB) is symbol('PQuntrace') {}
+        is native(LIBPQ) is symbol('PQuntrace') {}
 
     method notifies(--> PGnotify)
-        is native(LIB) is symbol('PQnotifies') {}
+        is native(LIBPQ) is symbol('PQnotifies') {}
 }
 
 class DB::Pg::Error is Exception
@@ -508,7 +508,7 @@ class DB::Pg::Database
 
     multi method error-check(PGresult:U $result)
     {
-        die DB::Pg::Error(message => $!conn.error-message);
+        die DB::Pg::Error.new(message => $!conn.error-message);
     }
 
     multi method error-check(PGresult:D $result)
