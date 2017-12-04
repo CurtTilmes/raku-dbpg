@@ -407,7 +407,7 @@ class DB::Pg::Statement
     {
         LEAVE { self.finish if (++$!row == $!rows) && $finish }
 
-        (return $hash ?? {} !! ()) unless $!row < $!rows;
+        return unless $!row < $!rows;
 
         my @row = do for ^@!columns.elems Z @!types -> [$col, $type]
         {
@@ -698,7 +698,7 @@ class DB::Pg::Database
                 if $!sth.rows
                 {
                     my $row = $!sth.row(:$!hash);
-                    return $row if $row.elems;
+                    return $row if $row && $row.elems;
                     $!sth.execute;
                     return self.pull-one;
                 }

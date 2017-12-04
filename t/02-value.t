@@ -5,11 +5,13 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 13;
+plan 14;
 
 my $pg = DB::Pg.new;
 
 is $pg.query('select 42').value, 42, 'value int';
+
+nok $pg.query('select 1 where 1=2').value, 'No value';
 
 is $pg.query('select $1::int', 42).value, 42, 'value int placeholder';
 

@@ -5,7 +5,7 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 8;
+plan 10;
 
 my $pg = DB::Pg.new;
 
@@ -41,6 +41,12 @@ for @cursor -> $row
 }
 
 is $count, 10000, '10000 rows retrieved';
+
+lives-ok { $pg.execute('delete from test') }, 'Delete rows';
+
+@cursor = $pg.cursor('select * from test', :hash);
+
+is-deeply @cursor, [], 'No rows from cursor';
 
 lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
 
