@@ -24,7 +24,7 @@ my $p = start react
     }
 }
 
-sleep .1;
+sleep .2;
 
 for ^5
 {
@@ -32,7 +32,7 @@ for ^5
     lives-ok { $pg.notify('bar', "$_ bar") }, "notify bar $_";
 }
 
-sleep .1;
+sleep .2;
 
 lives-ok { $pg.unlisten('bar') }, 'unlisten bar';
 
@@ -42,7 +42,7 @@ for 5..^10
     lives-ok { $pg.notify('bar', "$_ bar") }, "notify bar $_";
 }
 
-sleep .1;
+sleep .2;
 
 lives-ok { $pg.unlisten('foo') }, 'unlisten foo';
 

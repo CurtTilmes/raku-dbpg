@@ -407,7 +407,7 @@ class DB::Pg::Statement
     {
         LEAVE { self.finish if (++$!row == $!rows) && $finish }
 
-        return unless $!row < $!rows;
+        return () unless $!row < $!rows;
 
         my @row = do for ^@!columns.elems Z @!types -> [$col, $type]
         {
