@@ -65,3 +65,12 @@ Results
 
 Calling ```query``` (or ```do```) with a ```select``` or something that returns
 data, a ```DB::Pg::Results``` object will be returned.
+
+The query results can be consumed from that object with the following methods:
+
+* ```.value``` - a single scalar result
+* ```.array``` - a single array of results from one row
+* ```.hash``` - a single hash of results from one row
+* ```.arrays``` - a sequence of arrays of results from all rows
+* ```.hashes``` - a sequence of hashes of results from all rows
+
