@@ -81,13 +81,25 @@ directly:
 * ```.columns``` - List of column names returned
 * ```.types``` - List of Perl types of columns returned
 
+For example:
+
+```
+my $results = $pg.query('select * from foo');
+
+say $results.rows;
+say $results.columns;
+say $results.types;
+
+.say for $results.hashes;
+```
+
 Database
 --------
 
 Though you can just call ```.query()``` on the main ```DB::Pg``` object,
 sometimes you want to explicitly manage the database connection.  Use the
 ```.db``` method to get a ```DB::Pg::Database``` object, and call ```.finish```
-explicitly on it to return it to the cache.
+explicitly on it to return it to the cache when you are finished with it.
 
 The database object also has a ```.query()``` method, it just doesn't return
 the connection.
@@ -150,16 +162,73 @@ can be problematic, both for the time of the query, and the memory for all
 the results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
 provide a better way.
 
-
-
 Bulk Copy In
 ------------
+
+PostgreSQL has a [copy](https://www.postgresql.org/docs/10/static/sql-copy.html)
+facility for bulk copy in and out of the database.
+
+This is accessed with the ```DB::Pg::Database``` methods ```.copy-data``` and 
+```.copy-end```.  Pass blocks of data in with ```.copy-data```, and call
+```.copy-end``` when complete.
+
+```
+my $db = $pg.db;
+$db.execute('copy foo from stdin (format csv)'); # Any valid COPY command
+$db.copy-data("1,2\n4,5\n6,12\n")
+$db.copy-end;
+$db.finish;
+```
+
+As a convenience, these methods return the database object, so they can
+easily be chained (though you will probably loop the ```copy-data``` call.)
+
+```
+my $db = $pg.db.execute('copy foo from stdin');
+$db.copy-data("1 2\n12 34234\n").copy-end.finish;
+```
 
 Bulk Copy Out
 -------------
 
+Bulk copy out can performed too, a COPY command will return a sequence from
+an iterator which will return each line:
+
+```
+for $pg.execute('copy foo to stdout (format csv)') -> $line
+{
+    print $line;
+}
+```
+
 Listen/Notify
 -------------
+PostgreSQL also supports an asynchronous
+[LISTEN](https://www.postgresql.org/docs/10/static/sql-listen.html)
+command that you can use to receive notifications from the database.  
+The ```.listen()``` method returns a supply that can be used within a
+```react``` block.  You can listen to multiple channels, and all listens
+will share the same database connection.
+
+```
+react {
+    whenever $pg.listen('foo') -> $msg
+    {
+        say $msg;
+    }
+    whenever $pg.listen('bar') -> $msg
+    {
+        say $msg;
+    }
+}
+```
+
+Use ```.unlisten``` to stop listening to a specific channel.  When
+the last listened supply is unlistened, the react block will exit.
+
+```
+$pg.unlisten('foo')
+```
 
 Type Conversions
 ----------------
@@ -169,3 +238,5 @@ Arrays
 
 Exceptions
 ----------
+
+All database errors, including broken SQL queries, are thrown as exceptions.
