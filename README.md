@@ -34,3 +34,27 @@ Note, placeholders use the ```$1, $2, ...``` syntax instead of ```?``` See
 [PREPARE](https://www.postgresql.org/docs/current/static/sql-prepare.html) for
 more information.
 
+Connection Caching
+------------------
+
+Database connection handles are created on demand, and cached for reuse.
+Similarly, statement handles are prepared, cached and reused.
+
+When the first query is called, a new database connection will be created.
+After the results are read from the connection using the ```.value``` call,
+the connection will be returned and cached.  When the ```insert``` call is
+made, that cached connection will be reused for that query.
+
+If multiple simultaneously queries occur, perhaps in different threads, each
+will get a new connection so they won't interfere with one another.
+
+Connection caching is a nice convenience, but it does require some care from
+the consumer.  In order to reliably return the connection to the pool for the 
+next user, you must do one of two things:
+
+1. Read all the results.  Once the last returned row is read, the database
+connection handle will automatically get returned for reuse.
+
+2. Explicitly call ```.finish``` on the results object to prematurely return it.
+
+
