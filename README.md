@@ -49,7 +49,10 @@ If multiple simultaneously queries occur, perhaps in different threads, each
 will get a new connection so they won't interfere with one another.
 
 Connection caching is a nice convenience, but it does require some care from
-the consumer.  In order to reliably return the connection to the pool for the 
+the consumer.  If you call ```query``` (or ```do```) with an imperative statement
+(```insert```, ```update```, ```delete```) the connection will automatically
+be returned to the cache for re-use.  For a query that returns results, such as
+```select```, in order to reliably return the connection to the pool for the 
 next user, you must do one of two things:
 
 1. Read all the results.  Once the last returned row is read, the database
@@ -57,4 +60,8 @@ connection handle will automatically get returned for reuse.
 
 2. Explicitly call ```.finish``` on the results object to prematurely return it.
 
+Results
+-------
 
+Calling ```query``` (or ```do```) with a ```select``` or something that returns
+data, a ```DB::Pg::Results``` object will be returned.
