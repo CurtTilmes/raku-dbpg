@@ -18,12 +18,9 @@ my $pg = DB::Pg.new;  # You can pass in connection information if you want.
 ```
 
 Execute a query, and get a single value
-```
-say $pg.query('select 42').value;
-# 42
-```
+```say $pg.query('select 42').value;
+# 42```
 
 ```do``` is just an alias for ```query```.
 
-$pg.do('insert into foo (x,y) values ($1,$2)', 1, 'this');
-
+```$pg.do('insert into foo (x,y) values ($1,$2)', 1, 'this');```
