@@ -74,3 +74,98 @@ The query results can be consumed from that object with the following methods:
 * ```.arrays``` - a sequence of arrays of results from all rows
 * ```.hashes``` - a sequence of hashes of results from all rows
 
+You can also query for some information about the results on the object
+directly:
+
+* ```.rows``` - Total number of rows returned
+* ```.columns``` - List of column names returned
+* ```.types``` - List of Perl types of columns returned
+
+Database
+--------
+
+Though you can just call ```.query()``` on the main ```DB::Pg``` object,
+sometimes you want to explicitly manage the database connection.  Use the
+```.db``` method to get a ```DB::Pg::Database``` object, and call ```.finish```
+explicitly on it to return it to the cache.
+
+The database object also has a ```.query()``` method, it just doesn't return
+the connection.
+
+These are equivalent:
+
+```
+.say for $pg.query('select * from foo').arrays;
+```
+
+```
+my $db = $pg.db;
+.say for $db.query('select * from foo').arrays;
+$db.finish;
+```
+
+The database object also has some extra methods for separately preparing
+and executing a query:
+
+```
+my $db = $pg.db;
+my $sth = $db.prepare('insert into foo (x,y) values ($1,$2)');
+$sth.execute(1, 'this');
+$sth.execute(2, 'that');
+$db.finish;
+```
+
+Transactions
+------------
+
+The database object can also manage transactions with the ```.begin```,
+```.commit``` and ```.rollback``` methods.
+
+```
+my $db = $pg.db;
+my $sth = $db.prepare('insert into foo (x,y) values ($1,$2)');
+$db.begin;
+$sth.execute(1, 'this');
+$sth.execute(2, 'that');
+$db.commit;
+$db.finish;
+```
+
+The ```begin```/```commit``` ensure that the statements between them happen
+atomically, either all or none.
+
+Transactions can also dramatically improve performance for some actions,
+such as performing thousands of inserts/deletes/updates since the indices
+for the affected table can be updated in bulk once for the entire transaction.
+
+If you ```.finish``` the database prior to a ```.commit```, an uncommitted
+transaction will automatically be rolled back.
+
+Cursors
+-------
+
+When a query it performed, all the results from that query are immediately
+returned from the server to the client.  For exceptionally large queries, this
+can be problematic, both for the time of the query, and the memory for all
+the results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
+provide a better way.
+
+
+
+Bulk Copy In
+------------
+
+Bulk Copy Out
+-------------
+
+Listen/Notify
+-------------
+
+Type Conversions
+----------------
+
+Arrays
+------
+
+Exceptions
+----------
