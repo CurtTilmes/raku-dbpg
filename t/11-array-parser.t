@@ -28,8 +28,8 @@ is-deeply parseit(Num, '{11e542}'), [11e542], 'Num';
 
 is-deeply parseit(Int, '{ { 1, 2 }, { 3, 4 } }'), [[ 1,2 ], [3,4]], 'Int[]';
 
-is-deeply parseit(Str, '{ { 42, "this" }, { a, b, c } }'),
-                  [['42', 'this'],['a', 'b', 'c']], 'nested';
+is-deeply parseit(Str, '{ { 42, "this", abc }, { a, b, c } }'),
+                  [['42', 'this', 'abc'],['a', 'b', 'c']], 'nested';
 
 is-deeply parseit(Str, '{"this that"}'), ['this that'], 'embedded space';
 
