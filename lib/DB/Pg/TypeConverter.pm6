@@ -197,22 +197,22 @@ multi method convert(Str:D $type, Mu:D $value)
     self.convert: self.type($type), $value
 }
 
-multi method convert(Any:U, $value)      { $value }
+multi method convert(Any:U, Mu:D $value)      { $value }
 
-multi method convert(Bool:U, $value)     { $value eq 't' }
+multi method convert(Bool:U, Mu:D $value)     { $value eq 't' }
 
-multi method convert(Int:U, $value)      { $value.Int }
+multi method convert(Int:U, Mu:D $value)      { $value.Int }
 
-multi method convert(Num:U, $value)      { $value.Num }
+multi method convert(Num:U, Mu:D $value)      { $value.Num }
 
-multi method convert(Date:U, $value)     { Date.new($value) }
+multi method convert(Date:U, Mu:D $value)     { Date.new($value) }
 
-multi method convert(DateTime:U, $value)
+multi method convert(DateTime:U, Mu:D $value)
 {
     DateTime.new: $value.split(' ').join('T')
 }
 
-multi method convert(Buf:U, $value)
+multi method convert(Buf:U, Mu:D $value)
 {
     my size_t $bytes;
     my $ptr = PQunescapeBytea($value, $bytes) // die "Out of Memory";
@@ -220,7 +220,7 @@ multi method convert(Buf:U, $value)
     Buf.new(nativecast(CArray[uint8], $ptr)[0 ..^ $bytes])
 }
 
-multi method convert(Array:U $type, $value)
+multi method convert(Array:U $type, Mu:D $value)
 {
     my $*converter = self;
     my $*type = $type.of;
@@ -230,7 +230,7 @@ multi method convert(Array:U $type, $value)
     $/.made
 }
 
-multi method convert($value, Mu:U)
+multi method convert(Mu:D $value, Mu:U)
 {
     ~$value
 }
