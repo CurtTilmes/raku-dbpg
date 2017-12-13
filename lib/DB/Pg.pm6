@@ -1,230 +1,7 @@
-use NativeCall;
+use v6;
 use epoll;
-
-constant LIBPQ = 'pq';  # libpq.so
-
-enum ConnStatusType <
-    CONNECTION_OK
-    CONNECTION_BAD
->;
-
-enum ExecStatusType <
-    PGRES_EMPTY_QUERY
-    PGRES_COMMAND_OK
-    PGRES_TUPLES_OK
-    PGRES_COPY_OUT
-    PGRES_COPY_IN
-    PGRES_BAD_RESPONSE
-    PGRES_NONFATAL_ERROR
-    PGRES_FATAL_ERROR
-    PGRES_COPY_BOTH
-    PGRES_SINGLE_TUPLE
->;
-
-# Taken from DBDish::Pg::Native
-constant %oid-to-type = Map.new(
-        16  => Bool,  # bool
-        17  => Buf,   # bytea
-        18  => Str,   # char
-        19  => Str,   # name
-        20  => Int,   # int8
-        21  => Int,   # int2
-        23  => Int,   # int4
-        25  => Str,   # text
-        26  => Str,   # oid
-       114  => Str,   # json
-       142  => Str,   # xml
-       700  => Num,   # float4
-       701  => Num,   # float8
-       705  => Any,   # unknown
-       790  => Str,   # money
-      1000  => Array[Bool],    # _bool
-      1001  => Array[Buf],     # _bytea
-      1005  => Array[Int],     # Array(int2)
-      1007  => Array[Int],     # Array(int4)
-      1009  => Array[Str],     # Array(text)
-      1014  => Array[Str],     # _bpchar
-      1015  => Array[Str],     # _varchar
-      1016  => Array[Int],     # _int8
-      1021  => Array[Num],     # _float4
-      1022  => Array[Num],     # _float8
-      1028  => Array[Int],     # Array<oid>
-      1042  => Str,            # char(bpchar)
-      1043  => Str,            # varchar
-      1082  => Date,           # date
-      1083  => Str,            # time
-      1114  => DateTime,       # timestamp
-      1115  => Array[DateTime], # _timestamp
-      1182  => Array[Date],    # _date
-      1183  => Array[Str],     # _time
-      1184  => DateTime,       # Timestamp with time zone
-      1186  => Str,            # interval
-      1187  => Array[Str],          # _interval
-      1231  => Array[Num],          # _numeric
-      1263  => Array[Str],          # Array<varchar>
-      1700  => Num,                 # numeric
-      2950  => Str,                 # uuid
-      2951  => Array[Str],          # _uuid
-);
-
-sub PQlibVersion(-->uint32) is native(LIBPQ) {}
-sub PQfreemem(Pointer) is native(LIBPQ) {}
-sub PQunescapeBytea(Str $from, size_t $to_length is rw --> Pointer)
-    is native(LIBPQ) {}
-
-class PGresult is repr('CPointer')
-{
-    method PQresultStatus(--> int32)
-        is native(LIBPQ) {}
-
-    method status(--> ExecStatusType) { ExecStatusType(self.PQresultStatus) }
-
-    method error-message(--> Str) is native(LIBPQ)
-        is symbol('PQresultErrorMessage') {}
-
-    method clear() is native(LIBPQ)
-        is symbol('PQclear') {}
-
-    method tuples(--> int32)
-        is native(LIBPQ) is symbol('PQntuples') {}
-
-    method fields(--> int32)
-        is native(LIBPQ) is symbol('PQnfields') {}
-
-    method field-name(int32 $column_number --> Str)
-        is native(LIBPQ) is symbol('PQfname') {}
-
-    method field-type(int32 $column_number --> uint32)
-        is native(LIBPQ) is symbol('PQftype') {}
-
-    method getvalue(int32 $row_number, int32 $column_number --> Str)
-        is native(LIBPQ) is symbol('PQgetvalue') {}
-
-    method getisnull(int32 $row_number, int32 $column_number --> int32)
-        is native(LIBPQ) is symbol('PQgetisnull') {}
-
-    method getlength(int32 $row_number, int32 $column_number --> int32)
-        is native(LIBPQ) is symbol('PQgetlength') {}
-
-    method params(--> int32)
-        is native(LIBPQ) is symbol('PQnparams') {}
-
-    method param-type(int32 $param_number--> uint32)
-        is native(LIBPQ) is symbol('PQparamtype') {}
-
-    method format(int32 $column_number --> int32)
-        is native(LIBPQ) is symbol('PQfformat') {}
-}
-
-class PGnotify is repr('CStruct')
-{
-    has Str   $.relname;
-    has int32 $.be_pid;
-    has Str   $.extra;
-
-    method free { PQfreemem(nativecast(Pointer,self)) }
-}
-
-class PGconn is repr('CPointer')
-{
-    sub PQconnectdb(Str $conninfo --> PGconn)
-        is native(LIBPQ) {}
-
-    method new(Str $conninfo = '') { PQconnectdb($conninfo ) }
-
-    method finish()
-        is native(LIBPQ) is symbol('PQfinish') {}
-
-    method PQstatus(--> int32)
-        is native(LIBPQ) {}
-
-    method status(--> ConnStatusType) { ConnStatusType(self.PQstatus) }
-
-    method error-message(--> Str)
-        is native(LIBPQ) is symbol('PQerrorMessage') {}
-
-    method PQescapeByteaConn(Blob $from, size_t $from_length,
-                             size_t $to_length is rw --> Pointer)
-        is native(LIBPQ) {}
-
-    method escape-bytea(Blob:D $buf)
-    {
-        my size_t $bytes;
-        my $ptr = self.PQescapeByteaConn($buf, $buf.bytes, $bytes)
-                  // die "Out of Memory";
-        LEAVE PQfreemem($_) with $ptr;
-        nativecast(Str, $ptr)
-    }
-
-    method get-result(--> PGresult)
-        is native(LIBPQ) is symbol('PQgetResult') {}
-
-    method socket(--> int32)
-        is native(LIBPQ) is symbol('PQsocket') {}
-
-    method prepare(Str $stmtName,Str $query,int32 $nParams,
-                   CArray[uint32] $paramTypes --> PGresult)
-        is native(LIBPQ) is symbol('PQprepare') {}
-
-    method describe-prepared(Str $stmtName --> PGresult)
-        is native(LIBPQ) is symbol('PQdescribePrepared') {}
-
-    method exec(Str $command --> PGresult)
-        is native(LIBPQ) is symbol('PQexec') {}
-
-    method exec-prepared(Str $stmtName, int32 $nParams,
-                         CArray[Str] $paramValues,
-                         CArray[int32] $paramLengths,
-                         CArray[int32] $paramFormats,
-                         int32 $resultFormat --> PGresult)
-        is native(LIBPQ) is symbol('PQexecPrepared') {}
-
-    method get-copy-data(Pointer $ptr is rw, int32 $async --> int32)
-        is native(LIBPQ) is symbol('PQgetCopyData') {}
-
-    method put-copy-data(Blob $blob, int32 $nbytes --> int32)
-        is native(LIBPQ) is symbol('PQputCopyData') {}
-
-    method put-copy-end(Str $errormsg --> int32)
-        is native(LIBPQ) is symbol('PQputCopyEnd') {}
-
-    method consume-input(--> int32)
-        is native(LIBPQ) is symbol('PQconsumeInput') {}
-
-    method PQescapeIdentifier(Blob $blob, size_t $length --> Pointer)
-        is native(LIBPQ) is symbol('PQescapeIdentifier') {}
-
-    method PQescapeLiteral(Blob $blob, size_t $length --> Pointer)
-        is native(LIBPQ) is symbol('PQescapeLiteral') {}
-
-    method escape-literal(Str $str --> Str)
-    {
-        my $buf = $str.encode;
-        with self.PQescapeLiteral($buf, $buf.bytes)
-        {
-            LEAVE PQfreemem($_);
-            nativecast(Str, $_);
-        }
-        else
-        {
-            Nil
-        }
-    }
-
-    method PQtrace(Pointer $debug_port)
-        is native(LIBPQ) {}
-
-    sub fopen(Str $path, Str $mode --> Pointer)
-        is native {}
-
-    method trace(Str $path) { self.PQtrace(fopen($path, 'a')) }
-
-    method untrace()
-        is native(LIBPQ) is symbol('PQuntrace') {}
-
-    method notifies(--> PGnotify)
-        is native(LIBPQ) is symbol('PQnotifies') {}
-}
+use DB::Pg::Native;
+use DB::Pg::TypeConverter;
 
 class DB::Pg::Error is Exception
 {
@@ -236,146 +13,103 @@ class DB::Pg::Error::BadResponse is DB::Pg::Error {}
 class DB::Pg::Error::BadConnection is DB::Pg::Error {}
 class DB::Pg::Error::FatalError is DB::Pg::Error {}    # Not really Fatal..
 
+class DB::Pg::ArrayIterator does Iterator
+{
+    has $.sth;
+    has Bool $.finish;
+    has Bool $.hash;
+    has Int $.rows;
+    has Int $!row = 0;
+
+    method pull-one
+    {
+        if $!row == $!rows
+        {
+            $!sth.finish if $!finish;
+            return IterationEnd
+        }
+        $!sth.row($!row++, :$!hash)
+    }
+}
+
+class DB::Pg::CursorIterator does Iterator
+{
+    has $.sth;
+    has Str $.name;
+    has Bool $.hash;
+    has Bool $.finish;
+    has Int $.rows;
+    has Int $!row = 0;
+
+    method pull-one
+    {
+        try
+        {
+            if $!rows
+            {
+                return $!sth.row($!row++, :$!hash) if $!row < $!rows;
+                $!sth.execute;
+                $!rows = $!sth.rows;
+                $!row = 0;
+                return self.pull-one;
+            }
+            else
+            {
+                $!sth.db.execute("close $!name");
+                if $!finish
+                {
+                    $!sth.db.commit;
+                    $!sth.finish
+                }
+                return IterationEnd
+            }
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
+                {
+                    $!sth.finish if $!finish;
+                    .throw;
+                }
+            }
+        }
+    }
+}
+
 class DB::Pg::Results
 {
-    has Bool $.finishflag = False;
-    has $.sth handles <row rows columns types finish>;
+    has Bool $.finish = False;
+    has $.sth handles <rows columns types>;
+
+    method finish { $!sth.finish }
 
     method value
     {
-        LEAVE self.finish if $!finishflag;
-        $!sth.row()[0]
+        LEAVE $!sth.finish if $!finish;
+        $!sth.row(0)[0]
     }
 
     method array
     {
-        LEAVE self.finish if $!finishflag;
-        $!sth.row
+        LEAVE $!sth.finish if $!finish;
+        $!sth.row(0)
     }
 
     method hash
     {
-        LEAVE self.finish if $!finishflag;
-        $!sth.row(:hash)
+        LEAVE $!sth.finish if $!finish;
+        $!sth.row(0, :hash) or Nil
     }
 
     method arrays
     {
-        gather { while $!sth.row(finish => $!finishflag) -> $_ { .take } }
+        Seq.new: DB::Pg::ArrayIterator.new(:$!sth, :$!finish, :!hash,
+                                           rows => $!sth.rows)
     }
 
     method hashes
     {
-        gather { while $!sth.row(:hash, finish => $!finishflag) -> $_ { .take } }
-    }
-}
-
-grammar DB::Pg::ArrayGrammar {
-    rule TOP         { ^ <array> $ }
-    rule array       { '{' ~ '}' <element>+ %% ',' }
-    rule element     { <array> | <float> | <quoted> | <string> | <null> }
-    token float      { <[+-]>? \d+ ['.' \d+]? [ <[eE]> <[+-]>?  \d+ ]? }
-    token quoted     { '"' ~ '"' (<-["]>*) }
-    token string     { \w+ }
-    token null       { NULL }
-};
-
-class DB::Pg::ArrayActions
-{
-    has $.type;
-    has $.converter;
-
-    method TOP($/)
-    {
-        make $<array>.made
-    }
-
-    method array($/)
-    {
-        make $<element>».made
-    }
-
-    method element($/)
-    {
-        make $<array>.made // $<float>.made // $<quoted>.made //
-            $<string>.made // $<null>.made
-    }
-
-    method float($/)
-    {
-        make $!converter.convert($!type, ~$/)
-    }
-
-    method quoted($/)
-    {
-        make $!converter.convert($!type, ~$/[0]);
-    }
-
-    method string($/)
-    {
-        make $!converter.convert($!type, ~$/)
-    }
-
-    method null($/)
-    {
-        make $!type;
-    }
-}
-
-class DB::Pg::TypeConverter
-{
-    multi method convert(Any:U, $value)      { $value }
-
-    multi method convert(Bool:U, $value)     { $value eq 't' }
-
-    multi method convert(Int:U, $value)      { $value.Int }
-
-    multi method convert(Num:U, $value)      { $value.Num }
-
-    multi method convert(Date:U, $value)     { Date.new($value) }
-
-    multi method convert(DateTime:U, $value)
-    {
-        DateTime.new($value.split(' ').join('T'))
-    }
-
-    multi method convert(Buf:U, $value)
-    {
-        my size_t $bytes;
-        my $ptr = PQunescapeBytea($value, $bytes) // die "Out of Memory";
-        LEAVE PQfreemem($_) with $ptr;
-        Buf.new(nativecast(CArray[uint8], $ptr)[0 ..^ $bytes])
-    }
-
-    multi method convert(Array:U $type, $value)
-    {
-        DB::Pg::ArrayGrammar.parse($value,
-            actions => DB::Pg::ArrayActions.new(type => $type.of,
-                                                converter => self))
-            // die "Failed to parse array";
-
-        $/.made
-    }
-
-    multi method param(Mu:U, $value)
-    {
-        ~$value
-    }
-
-    multi method param(Buf:U, Blob:D $value, :$db)
-    {
-        $db.conn.escape-bytea($value)
-    }
-
-    multi method param(Array:U $type, @value)
-    {
-        '{' ~
-        @value.map(
-        {
-            when Array   { self.param($type, $_) }
-            when Numeric { $_ }
-            default      { '"' ~ $_.subst('"', '\\"') ~ '"' }
-        }).join(',') ~ '}'
+        Seq.new: DB::Pg::ArrayIterator.new(:$!sth, :$!finish, :hash,
+                                           rows => $!sth.rows)
     }
 }
 
@@ -387,52 +121,40 @@ class DB::Pg::Statement
     has @.columns;
     has @.types;
     has PGresult $.result;
-    has Int $.rows;
-    has Int $!row;
 
     method DESTROY
     {
-        .clear with $!result;
+        .clear with $!result
     }
 
     method finish
     {
         .clear with $!result;
         $!result = PGresult;
-        $!rows = 0;
-        $!db.finish;
+        $!db.finish
     }
 
-    method row(Bool :$hash, Bool :$finish)
-    {
-        LEAVE { self.finish if (++$!row == $!rows) && $finish }
+    method rows { $!result.tuples }
 
-        return () unless $!row < $!rows;
+    method row(Int $row, Bool :$hash)
+    {
+        return () unless 0 ≤ $row < self.rows;
 
         my @row = do for ^@!columns.elems Z @!types -> [$col, $type]
         {
-            $!result.getisnull($!row, $col)
+            $!result.getisnull($row, $col)
                 ?? $type
-                !! $!db.dbpg.converter.convert($type,
-                                               $!result.getvalue($!row, $col))
+                !! $!db.converter.convert($type, $!result.getvalue($row, $col))
         }
 
         $hash ?? %(@!columns Z=> @row) !! @row
     }
 
-    method execute(**@args, Bool :$finish = False)
+    method execute(**@args, Bool :$finish = False, Bool :$decode = True)
     {
-        my @params := CArray[Str].new;
-
-        for @args.kv -> $k, $v
-        {
-            @params[$k] = !$v.defined ?? Str !!
-                $!db.dbpg.converter.param(@!paramtypes[$k], $v, :$!db);
-        }
+        my @params := $!db.converter.convert-params(@args, @!paramtypes, :$!db);
 
         with $!result { .clear; $!result = PGresult }
-
-        $!row = $!rows = 0;
 
         try
         {
@@ -454,14 +176,24 @@ class DB::Pg::Statement
                 when PGRES_TUPLES_OK
                 {
                     $!result = $result;
-                    $!rows = $result.tuples;
-                    DB::Pg::Results.new(sth => self, finishflag => $finish)
+                    DB::Pg::Results.new(sth => self, :$finish)
                 }
                 when PGRES_COMMAND_OK
                 {
                     $result.clear;
                     self.finish if $finish;
                     $!db
+                }
+                when PGRES_COPY_IN
+                {
+                    $result.clear;
+                    $!db
+                }
+                when PGRES_COPY_OUT
+                {
+                    $result.clear;
+                    Seq.new: DB::Pg::CopyOutIterator.new(:$!db,
+                                                         :$finish, :$decode);
                 }
                 default { ... }
             }
@@ -471,9 +203,9 @@ class DB::Pg::Statement
 
 class DB::Pg::Database
 {
-    has PGconn $.conn handles<status>;
+    has PGconn $.conn;
     has $.dbpg;
-    has %.prepare-cache;
+    has %!prepare-cache;
     has $!counter = 0;
     has Bool $!active = True;
     has $!transaction = False;
@@ -486,7 +218,11 @@ class DB::Pg::Database
         $!active = False;
     }
 
+    method ping { $!conn.status == CONNECTION_OK }
+
     method active { $!active = True; self }
+
+    method converter { $!dbpg.converter }
 
     method finish
     {
@@ -546,73 +282,18 @@ class DB::Pg::Database
         $result = self.error-check: $!conn.describe-prepared($name);
 
         my @paramtypes = (^$result.params)
-            .map({ %oid-to-type{$result.param-type($_)} });
+            .map({ $.converter.type($result.param-type($_)) });
 
         my @columns = (^$result.fields).map({ $result.field-name($_) });
 
-        my @types = (^$result.fields).
-            map({ %oid-to-type{$result.field-type($_)} });
+        my @types = (^$result.fields)
+            .map({ $.converter.type($result.field-type($_)) });
 
         $result.clear;
 
         %!prepare-cache{$query} = DB::Pg::Statement.new(:db(self), :$name,
                                                         :@paramtypes, :@columns,
                                                         :@types);
-    }
-
-    my class DB::Pg::CopyOutIterator does Iterator
-    {
-        has $.db;
-        has $.finish;
-        has $.decode;
-
-        method pull-one
-        {
-            my Pointer $ptr .= new;
-
-            given $!db.conn.get-copy-data($ptr, 0)
-            {
-                when * > 0  # Number of bytes returned
-                {
-                    LEAVE PQfreemem($ptr);
-                    my $buf = Buf.new(nativecast(CArray[uint8], $ptr)[0 ..^ $_]);
-                    $!decode ?? $buf.decode !! $buf;
-                }
-                when -1     # Complete
-                {
-                    $!db.finish if $!finish;
-                    IterationEnd
-                }
-                when -2     # Error
-                {
-                    die DB::Pg::Error(message => $!db.conn.error-message);
-                }
-            }
-        }
-    }
-
-    multi method copy-end(Str $error = Str)
-    {
-        if $!conn.put-copy-end($error) == -1
-        {
-            die DB::Pg::Error(message => $!conn.error-message);
-        }
-        self.error-check($!conn.get-result).clear;
-        self
-    }
-
-    multi method copy-data(Blob:D $data)
-    {
-        if $!conn.put-copy-data($data, $data.bytes) == -1
-        {
-            die DB::Pg::Error(message => $!conn.error-message);
-        }
-        self
-    }
-
-    multi method copy-data(Str:D $data)
-    {
-        self.copy-data($data.encode);
     }
 
     method execute(Str:D $command, Bool :$finish = False, Bool :$decode = True)
@@ -639,6 +320,30 @@ class DB::Pg::Database
         }
     }
 
+    multi method copy-data(Blob:D $data)
+    {
+        if $!conn.put-copy-data($data, $data.bytes) == -1
+        {
+            die DB::Pg::Error(message => $!conn.error-message);
+        }
+        self
+    }
+
+    multi method copy-data(Str:D $data)
+    {
+        self.copy-data($data.encode);
+    }
+
+    multi method copy-end(Str $error = Str)
+    {
+        if $!conn.put-copy-end($error) == -1
+        {
+            die DB::Pg::Error(message => $!conn.error-message);
+        }
+        self.error-check($!conn.get-result).clear;
+        self
+    }
+
     method query(Str:D $query, Bool :$finish = False, |args)
     {
         try
@@ -647,8 +352,7 @@ class DB::Pg::Database
 
             CATCH
             {
-                when DB::Pg::Error::EmptyQuery |
-                     DB::Pg::Error::FatalError
+                when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
                  {
                      self.finish if $finish;
                      .throw;
@@ -684,47 +388,6 @@ class DB::Pg::Database
         self.execute("notify $channel, $!conn.escape-literal($extra)", :$finish);
     }
 
-    my class DB::Pg::CursorIterator does Iterator
-    {
-        has $.sth;
-        has $.name;
-        has $.hash;
-        has $.finish;
-
-        method pull-one
-        {
-            try
-            {
-                if $!sth.rows
-                {
-                    my $row = $!sth.row(:$!hash);
-                    return $row if $row && $row.elems;
-                    $!sth.execute;
-                    return self.pull-one;
-                }
-                else
-                {
-                    $!sth.db.execute("close $!name");
-                    if $!finish
-                    {
-                        $!sth.db.commit;
-                        $!sth.finish
-                    }
-                    return IterationEnd
-                }
-                CATCH
-                {
-                    when DB::Pg::Error::EmptyQuery |
-                         DB::Pg::Error::FatalError
-                    {
-                        $!sth.finish if $!finish;
-                        .throw;
-                    }
-                }
-            }
-        }
-    }
-
     method cursor(Str $query, *@args, Bool :$finish = False, Bool :$hash = False,
                   Int :$fetch = 1000)
     {
@@ -739,12 +402,12 @@ class DB::Pg::Database
             $sth.execute;
 
             return Seq.new: DB::Pg::CursorIterator.new(:$sth, :$name,
-                                                       :$hash, :$finish);
+                                                       :$hash, :$finish,
+                                                       rows => $sth.rows);
 
             CATCH
             {
-                when DB::Pg::Error::EmptyQuery |
-                     DB::Pg::Error::FatalError
+                when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
                  {
                      self.finish if $finish;
                      .throw;
@@ -763,6 +426,7 @@ class DB::Pg
     has $!connection-lock = Lock.new;
 
     has $!listen-db;
+    has $!listen-db-lock = Lock.new;
     has %!suppliers;
     has $!supplier-lock = Lock.new;
 
@@ -774,7 +438,7 @@ class DB::Pg
             {
                 my $db = @!connections.pop;
 
-                return $db.active if $db.status == CONNECTION_OK;
+                return $db.active if $db.ping;
 
                 $db.DESTROY;
             }
@@ -822,7 +486,7 @@ class DB::Pg
         self.db.notify($channel, $extra, :finish)
     }
 
-    method listen-loop
+    method !listen-loop
     {
         $!listen-db = self.db;
         my $epoll = epoll.new.add($!listen-db.conn.socket, :in);
@@ -850,7 +514,7 @@ class DB::Pg
     {
         return $_ with %!suppliers{$channel};
         $!supplier-lock.protect: { %!suppliers{$channel} = Supplier.new }
-        self.listen-loop unless $!listen-db;
+        $!listen-db-lock.protect: { self!listen-loop unless $!listen-db }
         $!listen-db.execute("listen $channel");
         %!suppliers{$channel}
     }

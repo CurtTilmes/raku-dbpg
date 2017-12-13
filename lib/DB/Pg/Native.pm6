@@ -179,3 +179,34 @@ class PGconn is repr('CPointer')
     method notifies(--> PGnotify)
         is native(LIBPQ) is symbol('PQnotifies') {}
 }
+
+class DB::Pg::CopyOutIterator does Iterator
+{
+    has $.db;
+    has $.finish;
+    has $.decode;
+
+    method pull-one
+    {
+        my Pointer $ptr .= new;
+
+        given $!db.conn.get-copy-data($ptr, 0)
+        {
+            when * > 0  # Number of bytes returned
+            {
+                LEAVE PQfreemem($ptr);
+                my $buf = Buf.new(nativecast(CArray[uint8], $ptr)[^$_]);
+                $!decode ?? $buf.decode !! $buf;
+            }
+            when -1     # Complete
+            {
+                $!db.finish if $!finish;
+                IterationEnd
+            }
+            when -2     # Error
+            {
+                die DB::Pg::Error(message => $!db.conn.error-message);
+            }
+        }
+    }
+}

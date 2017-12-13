@@ -1,6 +1,6 @@
 use NativeCall;
-
-constant LIBPQ = 'pq';  # libpq.so
+use DB::Pg::Native;
+use DB::Pg::ArrayParser;
 
 unit class DB::Pg::TypeConverter;
 
@@ -158,10 +158,6 @@ has %.type-map =
     '_jsonb'       => Array[Str],
 ;
 
-sub PQfreemem(Pointer) is native(LIBPQ) {}
-sub PQunescapeBytea(Str $from, size_t $to_length is rw --> Pointer)
-    is native(LIBPQ) {}
-
 method add-oid(*@oid-map)
 {
     for @oid-map -> Pair (:key($oid), :value($type))
@@ -179,16 +175,26 @@ method add-type(*%type-map)
     }
 }
 
-multi method type(Int $oid)
+multi method type(Int:D $oid)
 {
     die "Unknown oid $oid" unless %!oid-map{$oid}:exists;
     self.type(%!oid-map{$oid})
 }
 
-multi method type(Str $type)
+multi method type(Str:D $type)
 {
     die "Uknown type $type" unless %!type-map{$type}:exists;
     %!type-map{$type}
+}
+
+multi method convert(Int:D $oid, Mu:D $value)
+{
+    self.convert: self.type($oid), $value
+}
+
+multi method convert(Str:D $type, Mu:D $value)
+{
+    self.convert: self.type($type), $value
 }
 
 multi method convert(Any:U, $value)      { $value }
@@ -216,32 +222,52 @@ multi method convert(Buf:U, $value)
 
 multi method convert(Array:U $type, $value)
 {
-#    DB::Pg::ArrayGrammar.parse($value,
-#                               actions => DB::Pg::ArrayActions.new(type => $type.of,
-#                                                converter => self))
-#            // die "Failed to parse array";
-#
-#        $/.made
+    my $*converter = self;
+    my $*type = $type.of;
+
+    DB::Pg::ArrayParser.parse($value, actions => DB::Pg::ArrayActions)
+        // die "Failed to parse array";
+    $/.made
 }
 
-multi method param(Mu:U, $value)
+multi method convert($value, Mu:U)
 {
     ~$value
 }
 
-multi method param(Buf:U, Blob:D $value, :$db)
+multi method convert(Blob:D $value, Buf:U)
 {
-#        $db.conn.escape-bytea($value)
+    $*db.conn.escape-bytea($value)
 }
 
-#    multi method param(Array:U $type, @value, :$db)
-#    {
-#        '{' ~
-#        @value.map(
-#        {
-#            when Array   { self.param($type, $_, :$db) }
-#            when Numeric { $_ }
-#            default      { '"' ~ $_.subst('"', '\\"') ~ '"' }
-#        }).join(',')
-#        ~ '}'
-#    }
+multi method convert(@value, Array:U $type)
+{
+    '{' ~
+        @value.map(
+            {
+                when Array   { self.convert($_,$type) }
+                when Numeric { $_ }
+                default
+                {
+                    '"' ~
+                        .subst(/\"/, '\\"', :g)
+                        .subst(/\\/, Q<\\>, :g)
+                    ~ '"'
+                }
+            }).join(',')
+    ~ '}'
+}
+
+method convert-params(@args, @paramtypes, :$db)
+{
+    my $*db = $db;
+
+    my @params := CArray[Str].new;
+
+    for @args.kv -> $k, $v
+    {
+        @params[$k] = !$v.defined ?? Str !! self.convert($v, @paramtypes[$k])
+    }
+
+    @params
+}
