@@ -5,11 +5,9 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 13;
+plan 12;
 
 my $pg = DB::Pg.new;
-
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
 
 lives-ok { $pg.execute(q:to//) }, 'create table test';
     create table test
@@ -46,6 +44,6 @@ is-deeply $db.query("select * from test").hashes,
 
 $db.finish;
 
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
+lives-ok { $pg.execute('drop table test') }, 'drop table test';
 
 done-testing;

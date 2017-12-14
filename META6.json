@@ -10,6 +10,24 @@
     "tags" : [ "DATABASE" ],
 
     "provides" : {
+        "DB::Pg::ArrayParser" : "lib/DB/Pg/ArrayParser.pm6",
+
+        "DB::Pg::GeometricTypes" : "lib/DB/Pg/GeometricTypes.pm6",
+
+        "DB::Pg::Native" : "lib/DB/Pg/Native.pm6",
+
+        "DB::Pg::TypeConverter" : "lib/DB/Pg/TypeConverter.pm6",
+
+        "DB::Pg::TypeConverter::DateTime" :
+            "lib/DB/Pg/TypeConverter/DateTime.pm6",
+
+        "DB::Pg::TypeConverter::Geometric" :
+            "lib/DB/Pg/TypeConverter/Geometric.pm6",
+
+        "DB::Pg::TypeConverter::JSON" : "lib/DB/Pg/TypeConverter/JSON.pm6",
+
+        "DB::Pg::TypeConverter::UUID" : "lib/DB/Pg/TypeConverter/UUID.pm6",
+
         "DB::Pg" : "lib/DB/Pg.pm6"
     },
 

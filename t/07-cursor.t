@@ -5,11 +5,9 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 10;
+plan 9;
 
 my $pg = DB::Pg.new;
-
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
 
 lives-ok { $pg.execute(q:to//) }, 'create table test';
     create table test
@@ -48,6 +46,6 @@ lives-ok { $pg.execute('delete from test') }, 'Delete rows';
 
 is-deeply @cursor, [], 'No rows from cursor';
 
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
+lives-ok { $pg.execute('drop table test') }, 'drop table test';
 
 done-testing;

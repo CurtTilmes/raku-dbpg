@@ -5,11 +5,9 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 5;
+plan 4;
 
 my $pg = DB::Pg.new;
-
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
 
 lives-ok { $pg.execute(q:to//) }, 'create table test';
     create table test
@@ -32,6 +30,6 @@ is-deeply $pg.execute('copy test to stdout (format csv)'),
     ( "1,something\n", "2,more stuff\n", "3,yet more\n", "4,how about this\n"),
     'copy out';
 
-lives-ok { $pg.execute('drop table if exists test') }, 'drop table test';
+lives-ok { $pg.execute('drop table test') }, 'drop table test';
 
 done-testing;
