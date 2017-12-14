@@ -160,6 +160,24 @@ can be problematic, both for the time of the query, and the memory for all
 the results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
 provide a better way.
 
+```
+for $pg.cursor('select * from foo where x = $1', 27) -> $row
+{
+    say $row;
+}
+```
+
+The `cursor` method will fetch *N* rows at a time from the server (can be controlled
+with the `:fetch` parameter, default to 1,000.  The `:hash` parameter can be used to
+retrieve hashes for the rows instead of arrays.
+
+```
+for $pg.cursor('select * from foo', fetch => 500, :hash) -> %r
+{
+    say %r;
+}
+```
+
 Bulk Copy In
 ------------
 
@@ -182,8 +200,7 @@ As a convenience, these methods return the database object, so they can
 easily be chained (though you will probably loop the `copy-data` call.)
 
 ```
-my $db = $pg.db.execute('copy foo from stdin');
-$db.copy-data("1 2\n12 34234\n").copy-end.finish;
+$pg.db.execute('copy foo from stdin').copy-data("1 2\n12 34234\n").copy-end.finish;
 ```
 
 Bulk Copy Out
@@ -193,7 +210,7 @@ Bulk copy out can performed too, a COPY command will return a sequence from
 an iterator which will return each line:
 
 ```
-for $pg.execute('copy foo to stdout (format csv)') -> $line
+for $pg.query('copy foo to stdout (format csv)') -> $line
 {
     print $line;
 }
