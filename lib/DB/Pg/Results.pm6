@@ -1,6 +1,8 @@
+use DB::Pg::Native;
+
 class DB::Pg::ArrayIterator does Iterator
 {
-    has $.sth;
+    has $.res;
     has Bool $.finish;
     has Bool $.hash;
     has Int $.rows;
@@ -10,47 +12,72 @@ class DB::Pg::ArrayIterator does Iterator
     {
         if $!row == $!rows
         {
-            $!sth.finish if $!finish;
+            $!res.finish if $!finish;
             return IterationEnd
         }
-        $!sth.row($!row++, :$!hash)
+        $!res.row($!row++, :$!hash)
     }
 }
 
 class DB::Pg::Results
 {
     has Bool $.finish = False;
-    has $.sth handles <rows columns types>;
+    has $.sth handles <columns types>;
+    has PGresult $.result;
 
-    method finish { $!sth.finish }
+    method DESTROY { .clear with $!result }
+
+    method finish
+    {
+        .clear with $!result;
+        $!result = PGresult;
+        $!sth.finish
+    }
+
+    method rows { $!result.tuples }
+
+    method row(Int $row, Bool :$hash)
+    {
+        return () unless 0 ≤ $row < self.rows;
+
+        my @row = do for ^$!sth.columns.elems Z $!sth.types -> [$col, $type]
+        {
+            $!result.getisnull($row, $col)
+                ?? $type
+                !! $!sth.db.converter.convert($type,
+                                              $!result.getvalue($row, $col))
+        }
+
+        $hash ?? %($!sth.columns Z=> @row) !! @row
+    }
 
     method value
     {
-        LEAVE $!sth.finish if $!finish;
-        $!sth.row(0)[0]
+        LEAVE self.finish if $!finish;
+        self.row(0)[0]
     }
 
     method array
     {
-        LEAVE $!sth.finish if $!finish;
-        $!sth.row(0)
+        LEAVE self.finish if $!finish;
+        self.row(0)
     }
 
     method hash
     {
-        LEAVE $!sth.finish if $!finish;
-        $!sth.row(0, :hash) or Nil
+        LEAVE self.finish if $!finish;
+        self.row(0, :hash) or Nil
     }
 
     method arrays
     {
-        Seq.new: DB::Pg::ArrayIterator.new(:$!sth, :$!finish, :!hash,
-                                           rows => $!sth.rows)
+        Seq.new: DB::Pg::ArrayIterator.new(res => self, :$!finish, :!hash,
+                                           rows => self.rows)
     }
 
     method hashes
     {
-        Seq.new: DB::Pg::ArrayIterator.new(:$!sth, :$!finish, :hash,
-                                           rows => $!sth.rows)
+        Seq.new: DB::Pg::ArrayIterator.new(res => self, :$!finish, :hash,
+                                           rows => self.rows)
     }
 }

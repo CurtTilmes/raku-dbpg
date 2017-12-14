@@ -3,12 +3,34 @@ use DB::Pg::Statement;
 
 class DB::Pg::CursorIterator does Iterator
 {
-    has $.sth;
+    has DB::Pg::Statement $.sth;
     has Str $.name;
     has Bool $.hash;
     has Bool $.finish;
-    has Int $.rows;
-    has Int $!row = 0;
+    has Int $!rows;
+    has Int $!row;
+    has DB::Pg::Results $!res;
+
+    submethod TWEAK { self.fetch }
+
+    method fetch
+    {
+        try
+        {
+            $!res = $!sth.execute;
+
+            CATCH
+            {
+                when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
+                {
+                    $!sth.finish if $!finish;
+                    .throw;
+                }
+            }
+        }
+        $!rows = $!res.rows;
+        $!row = 0;
+    }
 
     method pull-one
     {
@@ -16,10 +38,8 @@ class DB::Pg::CursorIterator does Iterator
         {
             if $!rows
             {
-                return $!sth.row($!row++, :$!hash) if $!row < $!rows;
-                $!sth.execute;
-                $!rows = $!sth.rows;
-                $!row = 0;
+                return $!res.row($!row++, :$!hash) if $!row < $!rows;
+                self.fetch;
                 return self.pull-one;
             }
             else
@@ -28,7 +48,7 @@ class DB::Pg::CursorIterator does Iterator
                 if $!finish
                 {
                     $!sth.db.commit;
-                    $!sth.finish
+                    $!res.finish;
                 }
                 return IterationEnd
             }
@@ -43,7 +63,6 @@ class DB::Pg::CursorIterator does Iterator
         }
     }
 }
-
 
 class DB::Pg::Database
 {
@@ -243,11 +262,9 @@ class DB::Pg::Database
             self.query("declare $name cursor for $query", |@args);
 
             my $sth = self.prepare("fetch $fetch from $name");
-            $sth.execute;
 
             return Seq.new: DB::Pg::CursorIterator.new(:$sth, :$name,
-                                                       :$hash, :$finish,
-                                                       rows => $sth.rows);
+                                                       :$hash, :$finish);
 
             CATCH
             {

@@ -3,46 +3,15 @@ use DB::Pg::Results;
 
 class DB::Pg::Statement
 {
-    has $.db;
+    has $.db handles <finish>;
     has $.name;
     has @.paramtypes;
     has @.columns;
     has @.types;
-    has PGresult $.result;
-
-    method DESTROY
-    {
-        .clear with $!result
-    }
-
-    method finish
-    {
-        .clear with $!result;
-        $!result = PGresult;
-        $!db.finish
-    }
-
-    method rows { $!result.tuples }
-
-    method row(Int $row, Bool :$hash)
-    {
-        return () unless 0 ≤ $row < self.rows;
-
-        my @row = do for ^@!columns.elems Z @!types -> [$col, $type]
-        {
-            $!result.getisnull($row, $col)
-                ?? $type
-                !! $!db.converter.convert($type, $!result.getvalue($row, $col))
-        }
-
-        $hash ?? %(@!columns Z=> @row) !! @row
-    }
 
     method execute(**@args, Bool :$finish = False, Bool :$decode = True)
     {
         my @params := $!db.converter.convert-params(@args, @!paramtypes, :$!db);
-
-        with $!result { .clear; $!result = PGresult }
 
         try
         {
@@ -63,8 +32,7 @@ class DB::Pg::Statement
             {
                 when PGRES_TUPLES_OK
                 {
-                    $!result = $result;
-                    DB::Pg::Results.new(sth => self, :$finish)
+                    DB::Pg::Results.new(sth => self, :$result, :$finish)
                 }
                 when PGRES_COMMAND_OK
                 {
