@@ -17,6 +17,7 @@ class DB::Pg::CursorIterator does Iterator
     {
         try
         {
+            .clear with $!res;
             $!res = $!sth.execute;
 
             CATCH

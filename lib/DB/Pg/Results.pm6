@@ -25,12 +25,17 @@ class DB::Pg::Results
     has $.sth handles <columns types>;
     has PGresult $.result;
 
-    method DESTROY { .clear with $!result }
+    method DESTROY { self.clear }
 
-    method finish
+    method clear
     {
         .clear with $!result;
         $!result = PGresult;
+    }
+
+    method finish
+    {
+        self.clear;
         $!sth.finish
     }
 
