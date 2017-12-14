@@ -36,9 +36,9 @@ is $pg.query('select null').value, Any, 'Null';
 
 is $pg.query('select $1::text', Str).value, Str, 'Null String placeholder';
 
-is $pg.query("select '2000-01-01'::date").value, Date.new(2000,1,1), 'Date';
+is $pg.query("select '2000-01-01'::date").value, '2000-01-01', 'date';
 
 is $pg.query("select '2000-01-01'::timestamp").value,
-    DateTime.new(2000,1,1,0,0,0), 'DateTime';
+    '2000-01-01 00:00:00', 'timestamp';
 
 done-testing;

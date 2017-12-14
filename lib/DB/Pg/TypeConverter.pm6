@@ -136,12 +136,12 @@ has %.type-map =
     'varchar'      => Str,
     'date'         => Date,
     'time'         => Str,
-    'timestamp'    => DateTime,
-    '_timestamp'   => Array[DateTime],
-    '_date'        => Array[Date],
+    'timestamp'    => Str,
+    '_timestamp'   => Array[Str],
+    '_date'        => Array[Str],
     '_time'        => Array[Str],
-    'timestamptz'  => DateTime,
-    '_timestamptz' => Array[DateTime],
+    'timestamptz'  => Str,
+    '_timestamptz' => Array[Str],
     'interval'     => Str,
     '_interval'    => Array[Str],
     '_numeric'     => Array[Num],
@@ -204,13 +204,6 @@ multi method convert(Bool:U, Mu:D $value)     { $value eq 't' }
 multi method convert(Int:U, Mu:D $value)      { $value.Int }
 
 multi method convert(Num:U, Mu:D $value)      { $value.Num }
-
-multi method convert(Date:U, Mu:D $value)     { Date.new($value) }
-
-multi method convert(DateTime:U, Mu:D $value)
-{
-    DateTime.new: $value.split(' ').join('T')
-}
 
 multi method convert(Buf:U, Mu:D $value)
 {
