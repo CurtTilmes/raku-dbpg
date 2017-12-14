@@ -20,6 +20,15 @@ enum ExecStatusType <
     PGRES_SINGLE_TUPLE
 >;
 
+class DB::Pg::Error is Exception
+{
+    has $.message;
+}
+
+class DB::Pg::Error::EmptyQuery    is DB::Pg::Error {}
+class DB::Pg::Error::BadResponse   is DB::Pg::Error {}
+class DB::Pg::Error::BadConnection is DB::Pg::Error {}
+class DB::Pg::Error::FatalError    is DB::Pg::Error {}    # Not really Fatal..
 
 sub PQlibVersion(-->uint32) is native(LIBPQ) is export {}
 sub PQfreemem(Pointer) is native(LIBPQ) is export {}

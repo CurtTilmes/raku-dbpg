@@ -1,15 +1,15 @@
 DB::Pg PostgreSQL access for Perl 6
 ===================================
 
-First of all, this isn't DBI/DBIish.  If you want that, you know where to find
-it.  (if you don't, it's [over here](https://github.com/perl6/DBIish).)
+First of all, this isn't DBI/DBIish.  If you want that, you know where
+to find it.  (if you don't, it's [over here](https://github.com/perl6/DBIish).)
 
 This is a reimplementation of Perl 6 bindings for PostgreSQL's
 [libpq](https://www.postgresql.org/docs/current/static/libpq.html).
 
-Whereas DBI and friends like DBIish are a more generic database interface, this
-one is specific to PostgresQL.  If you want to access other databases, go look
-at DBIish.
+Whereas DBI and friends like DBIish are a more generic database
+interface, this one is specific to PostgresQL.  If you want to access
+other databases, go look at DBIish.
 
 Basic usage
 -----------
@@ -29,42 +29,46 @@ $pg.query('insert into foo (x,y) values ($1,$2)', 1, 'this');
 ```
 
 Note, placeholders use the `$1, $2, ...` syntax instead of `?` See
-[PREPARE](https://www.postgresql.org/docs/current/static/sql-prepare.html) for
-more information.
+[PREPARE](https://www.postgresql.org/docs/current/static/sql-prepare.html)
+for more information.
 
 Connection Caching
 ------------------
 
-Database connection handles are created on demand, and cached for reuse.
-Similarly, statement handles are prepared, cached and reused.
+Database connection handles are created on demand, and cached for
+reuse.  Similarly, statement handles are prepared, cached and reused.
 
-When the first query is called, a new database connection will be created.
-After the results are read from the connection using the `.value` call,
-the connection will be returned and cached.  When the `insert` call is
-made, that cached connection will be reused for that query.
+When the first query is called, a new database connection will be
+created.  After the results are read from the connection using the
+`.value` call, the connection will be returned and cached.  When the
+`insert` call is made, that cached connection will be reused for that
+query.
 
-If multiple simultaneously queries occur, perhaps in different threads, each
-will get a new connection so they won't interfere with one another.
+If multiple simultaneously queries occur, perhaps in different
+threads, each will get a new connection so they won't interfere with
+one another.
 
-Connection caching is a nice convenience, but it does require some care from
-the consumer.  If you call `query` with an imperative statement
-(`insert`, `update`, `delete`) the connection will automatically
-be returned to the pool for re-use.  For a query that returns results, such as
-`select`, in order to reliably return the connection to the pool for the 
-next user, you must do one of two things:
+Connection caching is a nice convenience, but it does require some
+care from the consumer.  If you call `query` with an imperative
+statement (`insert`, `update`, `delete`) the connection will
+automatically be returned to the pool for re-use.  For a query that
+returns results, such as `select`, in order to reliably return the
+connection to the pool for the next user, you must do one of two
+things:
 
-1. Read all the results.  Once the last returned row is read, the database
-connection handle will automatically get returned for reuse.
+1. Read all the results.  Once the last returned row is read, the
+database connection handle will automatically get returned for reuse.
 
 2. Explicitly call `.finish` on the results object to prematurely return it.
 
 Results
 -------
 
-Calling `query` with a `select` or something that returns data, a 
+Calling `query` with a `select` or something that returns data, a
 `DB::Pg::Results` object will be returned.
 
-The query results can be consumed from that object with the following methods:
+The query results can be consumed from that object with the following
+methods:
 
 * `.value` - a single scalar result
 * `.array` - a single array of results from one row
@@ -72,8 +76,8 @@ The query results can be consumed from that object with the following methods:
 * `.arrays` - a sequence of arrays of results from all rows
 * `.hashes` - a sequence of hashes of results from all rows
 
-You can also query for some information about the results on the object
-directly:
+You can also query for some information about the results on the
+object directly:
 
 * `.rows` - Total number of rows returned
 * `.columns` - List of column names returned
@@ -95,12 +99,13 @@ Database
 --------
 
 Though you can just call `.query()` on the main `DB::Pg` object,
-sometimes you want to explicitly manage the database connection.  Use the
-`.db` method to get a `DB::Pg::Database` object, and call `.finish`
-explicitly on it to return it to the pool when you are finished with it.
+sometimes you want to explicitly manage the database connection.  Use
+the `.db` method to get a `DB::Pg::Database` object, and call
+`.finish` explicitly on it to return it to the pool when you are
+finished with it.
 
-The database object also has a `.query()` method, it just doesn't return
-the connection.
+The database object also has a `.query()` method, it just doesn't
+return the connection.
 
 These are equivalent:
 
@@ -114,8 +119,8 @@ my $db = $pg.db;
 $db.finish;
 ```
 
-The database object also has some extra methods for separately preparing
-and executing a query:
+The database object also has some extra methods for separately
+preparing and executing a query:
 
 ```
 my $db = $pg.db;
@@ -144,20 +149,25 @@ $db.finish;
 The `begin`/`commit` ensure that the statements between them happen
 atomically, either all or none.
 
-Transactions can also dramatically improve performance for some actions,
-such as performing thousands of inserts/deletes/updates since the indices
-for the affected table can be updated in bulk once for the entire transaction.
+Transactions can also dramatically improve performance for some
+actions, such as performing thousands of inserts/deletes/updates since
+the indices for the affected table can be updated in bulk once for the
+entire transaction.
 
 If you `.finish` the database prior to a `.commit`, an uncommitted
 transaction will automatically be rolled back.
 
+As a convenience, `.commit` also returns the database object, so you
+can just `$db.commit.finish`.
+
 Cursors
 -------
 
-When a query it performed, all the results from that query are immediately
-returned from the server to the client.  For exceptionally large queries, this
-can be problematic, both for the time of the query, and the memory for all
-the results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
+When a query it performed, all the results from that query are
+immediately returned from the server to the client.  For exceptionally
+large queries, this can be problematic, both for the time of the
+query, and the memory for all the
+results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
 provide a better way.
 
 ```
@@ -167,9 +177,10 @@ for $pg.cursor('select * from foo where x = $1', 27) -> $row
 }
 ```
 
-The `cursor` method will fetch *N* rows at a time from the server (can be controlled
-with the `:fetch` parameter, default to 1,000.  The `:hash` parameter can be used to
-retrieve hashes for the rows instead of arrays.
+The `cursor` method will fetch *N* rows at a time from the server (can
+be controlled with the `:fetch` parameter, defaults to 1,000).  The
+`:hash` parameter can be used to retrieve hashes for the rows instead
+of arrays.
 
 ```
 for $pg.cursor('select * from foo', fetch => 500, :hash) -> %r
@@ -181,10 +192,11 @@ for $pg.cursor('select * from foo', fetch => 500, :hash) -> %r
 Bulk Copy In
 ------------
 
-PostgreSQL has a [copy](https://www.postgresql.org/docs/10/static/sql-copy.html)
+PostgreSQL has a
+[copy](https://www.postgresql.org/docs/10/static/sql-copy.html)
 facility for bulk copy in and out of the database.
 
-This is accessed with the `DB::Pg::Database` methods `.copy-data` and 
+This is accessed with the `DB::Pg::Database` methods `.copy-data` and
 `.copy-end`.  Pass blocks of data in with `.copy-data`, and call
 `.copy-end` when complete.
 
@@ -196,8 +208,9 @@ $db.copy-end;
 $db.finish;
 ```
 
-As a convenience, these methods return the database object, so they can
-easily be chained (though you will probably loop the `copy-data` call.)
+As a convenience, these methods return the database object, so they
+can easily be chained (though you will probably loop the `copy-data`
+call.)
 
 ```
 $pg.db.execute('copy foo from stdin').copy-data("1 2\n12 34234\n").copy-end.finish;
@@ -206,8 +219,8 @@ $pg.db.execute('copy foo from stdin').copy-data("1 2\n12 34234\n").copy-end.fini
 Bulk Copy Out
 -------------
 
-Bulk copy out can performed too, a COPY command will return a sequence from
-an iterator which will return each line:
+Bulk copy out can performed too, a COPY command will return a sequence
+from an iterator which will return each line:
 
 ```
 for $pg.query('copy foo to stdout (format csv)') -> $line
@@ -218,9 +231,10 @@ for $pg.query('copy foo to stdout (format csv)') -> $line
 
 Listen/Notify
 -------------
+
 PostgreSQL also supports an asynchronous
 [LISTEN](https://www.postgresql.org/docs/10/static/sql-listen.html)
-command that you can use to receive notifications from the database.  
+command that you can use to receive notifications from the database.
 The `.listen()` method returns a supply that can be used within a
 `react` block.  You can listen to multiple channels, and all listens
 will share the same database connection.
@@ -238,8 +252,8 @@ react {
 }
 ```
 
-Use `.unlisten` to stop listening to a specific channel.  When
-the last listened supply is unlistened, the react block will exit.
+Use `.unlisten` to stop listening to a specific channel.  When the
+last listened supply is unlistened, the react block will exit.
 
 ```
 $pg.unlisten('foo')
@@ -248,20 +262,27 @@ $pg.unlisten('foo')
 Type Conversions
 ----------------
 
-The `DB::Pg::TypeConverter` object is used to convert between PostgreSQL types and
-Perl types.  It has two maps, one from [oid](https://www.postgresql.org/docs/current/static/datatype-oid.html)
-types to PostgreSQL type names, and one from the type names to Perl types.
+The `DB::Pg::TypeConverter` object is used to convert between
+PostgreSQL types and Perl types.  It has two maps, one from
+[oid](https://www.postgresql.org/docs/current/static/datatype-oid.html)
+types to PostgreSQL type names, and one from the type names to Perl
+types.
 
-For example, the oid `23` maps to the PostgreSQL type `int` which maps to the Perl type `Int`.
+For example, the oid `23` maps to the PostgreSQL type `int` which maps
+to the Perl type `Int`.
 
-`DB::Pg::TypeConverter` has a multiple dispatch method `convert()` that is used to convert types.
+`DB::Pg::TypeConverter` has a multiple dispatch method `convert()`
+that is used to convert types.
 
-Extra roles can be mixed in to the default converter to enable it to convert to and from other types.
+Extra roles can be mixed in to the default converter to enable it to
+convert to and from other types.
 
-The `converter()` method on the main `DB::Pg` object will return the current converter, then `does` can
-be used to add a role with extra conversion methods.
+The `converter()` method on the main `DB::Pg` object will return the
+current converter, then `does` can be used to add a role with extra
+conversion methods.
 
-Here is a short example that causes the PostgreSQL 'json' and 'jsonb' types to be converted automatically.
+Here is a short example that causes the PostgreSQL 'json' and 'jsonb'
+types to be converted automatically.
 
 ```
 use DB::Pg;
@@ -279,34 +300,40 @@ $pg.converter does role JSONConverter
 }
 ```
 
-There are three parts to this conversion.  First the `BUILD` adds the type mappings, then there are
-two methods, the first converts from a string (`Str:D`) to a `JSON:U` type.  The second will be used
-when a parameter requires a JSON object.  If the object already has a `Str` method that results in
-a suitable string for PostgreSQL (often the case), the second method can be omitted.  (Or if you
-are only reading a type from the database, and never passing it to the server.)
+There are three parts to this conversion.  First the `BUILD` adds the
+type mappings, then there are two methods, the first converts from a
+string (`Str:D`) to a `JSON:U` type.  The second will be used when a
+parameter requires a JSON object.  If the object already has a `Str`
+method that results in a suitable string for PostgreSQL (often the
+case), the second method can be omitted.  (Or if you are only reading
+a type from the database, and never passing it to the server.)
 
-Several TypeConverters are bundled with this module, so they can be easily added to the default
-TypeConverter:
+Several TypeConverters are bundled with this module, and by default
+they are added to the TypeConverter automatically:
 
-```
-use DB::Pg;
-use DB::Pg::TypeConverter::JSON;      # json, jsonb
-use DB::Pg::TypeConverter::DateTime;  # date, timestamp, timestamptz -> Date, DateTime
-use DB::Pg::TypeConverter::UUID;      # uuid -> UUID via LibUUID
-use DB::Pg::TypeConverter::Geometric; # point, line, lseg, box, path, polygon, circle
-
-my $pg = DB::Pg.new;
-
-$pg.converter does DB::Pg::TypeConverter::JSON
-              does DB::Pg::TypeConverter::DateTime
-              does DB::Pg::TypeConverter::UUID
-              does DB::Pg::TypeConverter::Geometric;
-```
+* DateTime (date, timestamp, timestamptz -> Date, DateTime)
+* JSON (json, jsonb)
+* UUID (uuid -> UUID via LibUUID)
+* Geometric (point, line, lseg, box, path, polygon, circle)
 
 The Geometric types are available in `DB::Pg::GeometricTypes`.
 
+If you *don't* want any of those converters, just pass in an empty
+`converters` array, or with just the ones you want:
+
+```
+my $pg = DB::Pg.new(converters => <DateTime JSON>)
+```
+
+If you want a different type of conversion than those canned types,
+just exclude the default one and install your own as above.
+
 Arrays
 ------
+
+Most types of arrays are handled by default.  When selecting, they
+will be converted to Perl Array objects.  Likewise, to pass arrays to
+the server, just pass a Perl Array object.
 
 Exceptions
 ----------

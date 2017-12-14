@@ -12,9 +12,15 @@
     "provides" : {
         "DB::Pg::ArrayParser" : "lib/DB/Pg/ArrayParser.pm6",
 
+        "DB::Pg::Database" : "lib/DB/Pg/Database.pm6",
+
         "DB::Pg::GeometricTypes" : "lib/DB/Pg/GeometricTypes.pm6",
 
         "DB::Pg::Native" : "lib/DB/Pg/Native.pm6",
+
+        "DB::Pg::Results" : "lib/DB/Pg/Results.pm6",
+
+        "DB::Pg::Statement" : "lib/DB/Pg/Statement.pm6",
 
         "DB::Pg::TypeConverter" : "lib/DB/Pg/TypeConverter.pm6",
 
