@@ -4,9 +4,10 @@ use Test;
 use Test::When <extended>;
 
 use DB::Pg;
+use DB::Pg::GeometricTypes;
 use DB::Pg::TypeConverter::Geometric;
 
-plan 1;
+plan 7;
 
 my $pg = DB::Pg.new;
 
