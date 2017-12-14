@@ -247,9 +247,10 @@ class DB::Pg::Database
         self
     }
 
-    method notify(Str:D $channel, Str:D $extra, Bool :$finish = False)
+    method notify(Str:D $channel, Str:D $message, Bool :$finish = False)
     {
-        self.execute("notify $channel, $!conn.escape-literal($extra)", :$finish);
+        self.execute("notify $channel, $!conn.escape-literal($message)",
+                     :$finish);
     }
 
     method cursor(Str $query, *@args, Bool :$finish = False, Bool :$hash = False,
@@ -278,3 +279,126 @@ class DB::Pg::Database
         }
     }
 }
+
+=begin pod
+
+=head1 NAME
+
+DB::Pg::Database -- Database object
+
+=head1 SYNOPSIS
+
+ my $pg = DB::Pg.new;
+
+ my $db = $pg.db;
+
+ say "Good connection" if $db.ping;
+
+ say $db.query('select * from foo where x = $1', 27).hash;
+
+ my $sth = $db.prepare('select * from foo where x = $1'); # DB::Pg::Statement
+
+ $db.execute('insert into foo (x,y) values (1,2)'); # No args, no return
+
+ $db.begin;
+
+ $db.query('copy foo from stdin (format csv)');
+ $db.copy-data("1,2\n");
+ $db.copy-end;
+
+ $db.commit;
+
+ $db.notify('foo', 'message');
+
+ for $db.cursor('select * from foo') -> @row
+ {
+     say @row
+ }
+
+ $db.finish; # Finished with database, return to idle pool
+
+=head1 DESCRIPTION
+
+Always allocate from a C<DB::Pg> object with the C<.db> method.  Use
+C<.finish> to return the database connection to the pool when
+finished.
+
+=head1 METHODS
+
+=head2 B<finish>()
+
+Return this database connection to the connection pool in the parent
+C<DB::Pg> object.
+
+=head2 B<ping>()
+
+Returns True if the connection to the server is good.
+
+=head2 B<execute>(Str:D $sql, Bool :finish)
+
+Execute an SQL statement which requires no arguments and returns
+nothing.  This can be used for SQL COPY commands.
+
+If :finish is True, the database connection will be C<finish>ed after
+the command executes.
+
+=head2 B<prepare>(Str:D $query --> DB::Pg::Statement)
+
+Prepares the SQL query, returning a C<DB::Pg::Statement> object with
+the prepared query.  These are cached in the database object, so if
+the same query is prepared again, the previous statement is returned.
+
+=head2 B<query>(Str:D $query, *@args, Bool :finish)
+
+prepares, then executes the query with the supplied arguments.
+
+=head2 B<begin>()
+
+Begins a new database transaction
+
+Returns the C<DB::Pg::Database> object.
+
+=head2 B<commit>()
+
+Commits an active database transaction
+
+Returns the C<DB::Pg::Database> object.
+
+=head2 B<rollback>()
+
+Rolls back an active database transaction.  If the database is
+finished with an active transaction, it will be rolled back
+automatically.
+
+Returns the C<DB::Pg::Database> object.
+
+=head2 B<cursor>(Str:D $sql, *@args, Bool :hash, Int :fetch, Bool :finish)
+
+Creates and returns the cursor sequence.  B<:fetch> defaults to 1000
+rows per database fetch.  B<:hash> returns hashes for rows instead of
+arrays.
+
+If :finish is true, C<finish>es the database connection.
+
+=head2 B<notify>(Str:D $channel, Str:D $message, Bool :finish)
+
+Issues a PostgreSQL NOTIFY on the specified channel.
+
+If :finish is true, C<finish>es the database connection.
+
+=head2 B<copy-data>($data)
+
+Following an SQL COPY command, this can be used to send bulk data to
+the server.  C<$data> can be either a C<Blob> of raw data, or a
+C<Str>.  If it is a string, it is encoded as UTF-8 first.
+
+Returns the C<DB::Pg::Database> object.
+
+=head2 B<copy-end>(Str $error)
+
+Ends a COPY sequence.  If $error is set, the COPY fails with the
+supplied error, throwing an Exception.
+
+Returns the C<DB::Pg::Database> object.
+
+=end pod

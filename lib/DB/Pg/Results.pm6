@@ -86,3 +86,81 @@ class DB::Pg::Results
                                            rows => self.rows)
     }
 }
+
+=begin pod
+
+=head1 NAME
+
+DB::Pg::Results -- Results from a PostgreSQL query
+
+=head1 SYNOPSIS
+
+ my $results = $sth.execute(1);
+
+ say $results.rows;     # Number of rows returned
+
+ say $results.columns;  # Array of column (field) names
+
+ say $results.types;    # Array of column Perl types
+
+ say $results.value;    # A single scalar value
+
+ say $results.array;    # A single array with one row
+
+ say $results.hash;     # A single hash with one row
+
+ say $results.arrays;   # A sequence of arrays with all rows
+
+ say $results.hashes;   # A sequence of hashes with all rows
+
+ $results.finish        # Only needed if results aren't consumed.
+
+=head1 DESCRIPTION
+
+Returned from a C<DB::Pg::Statement> execution that returns results.
+
+=head1 METHODS
+
+=head2 B<rows>()
+
+Returns number of rows returned.
+
+=head2 B<columns>()
+
+Array of the names of the columns (fields) to be returned.
+
+=head2 B<types>()
+
+Array of the Perl types of the columns (fields) to be returned.
+
+=head2 B<finish>()
+
+Finish with the database connection.  This is only needed if the complete
+database returns aren't consumed.
+
+=head2 B<row>(Int $row, Bool :hash)
+
+Retrieves a specific row from the results, either as an array, or as a
+Hash if :hash is True.
+
+=head2 B<value>()
+
+Return a single scalar value from the results.
+
+=head2 B<array>()
+
+Return a single row from the results as an array.
+
+=head2 B<hash>()
+
+Return a single row from the results as a hash.
+
+=head2 B<arrays>()
+
+Returns a sequence of all rows as arrays.
+
+=head2 B<hashes>()
+
+Returns a sequence of all rows as hashes.
+
+=end pod

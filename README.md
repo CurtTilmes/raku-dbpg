@@ -313,6 +313,12 @@ last listened supply is unlistened, the react block will exit.
 $pg.unlisten('foo')
 ```
 
+PostgreSQL notifications can be sent with the `.notify` method:
+
+```
+$pg.notify('foo', 'a message');
+```
+
 Type Conversions
 ----------------
 
