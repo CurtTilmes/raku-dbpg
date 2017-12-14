@@ -1,15 +1,32 @@
-DB::Pg PostgreSQL access for Perl 6
-===================================
+DB::Pg – PostgreSQL access for Perl 6
+=====================================
 
 First of all, this isn't DBI/DBIish.  If you want that, you know where
-to find it.  (if you don't, it's [over here](https://github.com/perl6/DBIish).)
+to find it.  (if you don't, it's [over
+here](https://github.com/perl6/DBIish).)
 
 This is a reimplementation of Perl 6 bindings for PostgreSQL's
 [libpq](https://www.postgresql.org/docs/current/static/libpq.html).
 
 Whereas DBI and friends like DBIish are a more generic database
-interface, this one is specific to PostgresQL.  If you want to access
-other databases, go look at DBIish.
+interface, this one is specific to PostgreSQL.  If you want to access
+other databases, or think you might switch to them at some point, go
+look at DBIish.
+
+Why?
+----
+
+DBIish, in its existing form, has several limitations, not just in
+incomplete implementation (which is true), but also in the overall
+architecture and structure make it difficult to work the way I want it
+to.  I tried several approaches to building a layer on top of DBIish
+(or even DBDish::Pg), but eventually it became easier to just
+re-implement directly on top of libpq.  I understand that DBI itself
+has a roadmap, so at some point I may decide to move back to that
+world.  In the meantime, this meets my needs and has a friendly usage
+that make it much easier for me to use than DBIish, so I decided to
+release it and perhaps it may help you as well.  If you want to use
+DBIish, go ahead.. I don't mind.
 
 Basic usage
 -----------
@@ -200,17 +217,17 @@ can just `$db.commit.finish`.
 Cursors
 -------
 
-When a query it performed, all the results from that query are
+When a query is performed, all the results from that query are
 immediately returned from the server to the client.  For exceptionally
-large queries, this can be problematic, both for the time of the
-query, and the memory for all the
+large queries, this can be problematic, both waiting the time for the
+whole query to execute, and the memory for all the
 results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
 provide a better way.
 
 ```
-for $pg.cursor('select * from foo where x = $1', 27) -> $row
+for $pg.cursor('select * from foo where x = $1', 27) -> @row
 {
-    say $row;
+    say @row;
 }
 ```
 
@@ -230,7 +247,7 @@ Bulk Copy In
 ------------
 
 PostgreSQL has a
-[copy](https://www.postgresql.org/docs/10/static/sql-copy.html)
+[COPY](https://www.postgresql.org/docs/10/static/sql-copy.html)
 facility for bulk copy in and out of the database.
 
 This is accessed with the `DB::Pg::Database` methods `.copy-data` and
@@ -384,3 +401,14 @@ Inspiration taken from the existing Perl6
 (DBIish)[https://github.com/perl6/DBIish] module as well as the Perl 5
 (Mojo::Pg)[http://mojolicious.org/perldoc/Mojo/Pg] from the
 Mojolicious project.
+
+License
+-------
+
+
+Copyright
+---------
+Copyright © 2017 United States Government as represented by the
+Administrator of the National Aeronautics and Space Administration.
+No copyright is claimed in the United States under Title 17,
+U.S.Code. All Other Rights Reserved.
