@@ -398,8 +398,8 @@ Acknowledgements
 ----------------
 
 Inspiration taken from the existing Perl6
-(DBIish)[https://github.com/perl6/DBIish] module as well as the Perl 5
-(Mojo::Pg)[http://mojolicious.org/perldoc/Mojo/Pg] from the
+[DBIish](https://github.com/perl6/DBIish) module as well as the Perl 5
+[Mojo::Pg](http://mojolicious.org/perldoc/Mojo/Pg) from the
 Mojolicious project.
 
 License
