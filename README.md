@@ -18,12 +18,13 @@ Basic usage
 my $pg = DB::Pg.new;  # You can pass in connection information if you want.
 ```
 
-Execute a query, and get a single value
+Execute a query, and get a single value:
 ```
 say $pg.query('select 42').value;
 # 42
 ```
 
+Insert some values using placeholders:
 ```
 $pg.query('insert into foo (x,y) values ($1,$2)', 1, 'this');
 ```
@@ -32,21 +33,50 @@ Note, placeholders use the `$1, $2, ...` syntax instead of `?` See
 [PREPARE](https://www.postgresql.org/docs/current/static/sql-prepare.html)
 for more information.
 
+Execute a query returning a row as an array or hash;
+```
+say $pg.query('select * from foo where x = $1', 42).array;
+say $pg.query('select * from foo where x = $1', 42).hash;
+```
+
+Execute a query returning a bunch of rows as arrays or hashes:
+```
+.say for $pg.query('select * from foo').arrays;
+.say for $pg.query('select * from foo').hashes;
+```
+
+If you have no placeholders/arguments and aren't retrieving
+information, you can use `execute`.  It does not `PREPARE` the query.
+
+```
+$pg.execute('insert into foo (x,y) values (1,2)');
+```
+
 Connection Caching
 ------------------
 
 Database connection handles are created on demand, and cached for
-reuse.  Similarly, statement handles are prepared, cached and reused.
+reuse in a connection pool.  Similarly, statement handles are
+prepared, cached and reused.
 
 When the first query is called, a new database connection will be
-created.  After the results are read from the connection using the
-`.value` call, the connection will be returned and cached.  When the
-`insert` call is made, that cached connection will be reused for that
-query.
+created.  After the results are read from the connection, the
+connection will be returned and cached in the pool.  When a later
+query is performed, that cached connection will be reused.
 
-If multiple simultaneously queries occur, perhaps in different
-threads, each will get a new connection so they won't interfere with
-one another.
+If multiple simultaneous queries occur, perhaps in different threads,
+each will get a new connection so they won't interfere with one
+another.
+
+For example, you can perform database actions while iterating through
+results from a query:
+
+```
+for $pg.query('select * from foo').hashes -> %h
+{
+    $pg.query('update bar set ... where x = $1...$2...', %h<x>, %h<y>);
+}
+```
 
 Connection caching is a nice convenience, but it does require some
 care from the consumer.  If you call `query` with an imperative
@@ -104,8 +134,9 @@ the `.db` method to get a `DB::Pg::Database` object, and call
 `.finish` explicitly on it to return it to the pool when you are
 finished with it.
 
-The database object also has a `.query()` method, it just doesn't
-return the connection.
+The database object also has `.query()` and `.execute()` methods, they
+just don't automatically `.finish` to return the handle to the pool.
+You must explicitly do that after use.
 
 These are equivalent:
 
@@ -129,6 +160,12 @@ $sth.execute(1, 'this');
 $sth.execute(2, 'that');
 $db.finish;
 ```
+
+`.prepare()` returns a `DB::Pg::Statement` object.
+
+It can be more efficient to perform many actions in this way and avoid
+the overhead of returning the connection to the pool only to
+immediately get it back again.
 
 Transactions
 ------------
@@ -339,3 +376,11 @@ Exceptions
 ----------
 
 All database errors, including broken SQL queries, are thrown as exceptions.
+
+Acknowledgements
+----------------
+
+Inspiration taken from the existing Perl6
+(DBIish)[https://github.com/perl6/DBIish] module as well as the Perl 5
+(Mojo::Pg)[http://mojolicious.org/perldoc/Mojo/Pg] from the
+Mojolicious project.

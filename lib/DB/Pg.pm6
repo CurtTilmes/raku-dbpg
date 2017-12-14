@@ -1,11 +1,12 @@
 use epoll;
+
 use DB::Pg::Native;
+use DB::Pg::Database;
 use DB::Pg::TypeConverter;
 use DB::Pg::TypeConverter::DateTime;
 use DB::Pg::TypeConverter::Geometric;
 use DB::Pg::TypeConverter::JSON;
 use DB::Pg::TypeConverter::UUID;
-use DB::Pg::Database;
 
 class DB::Pg
 {
