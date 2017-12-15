@@ -75,6 +75,7 @@ has %.oid-map =
     1562  => 'varbit',
     1563  => '_varbit',
     1700  => 'numeric',
+    2278  => 'void',
     2950  => 'uuid',
     2951  => '_uuid',
     3802  => 'jsonb',
@@ -134,7 +135,7 @@ has %.type-map =
     '_inet'        => Array[Str],
     'bpchar'       => Str,
     'varchar'      => Str,
-    'date'         => Date,
+    'date'         => Str,
     'time'         => Str,
     'timestamp'    => Str,
     '_timestamp'   => Array[Str],
@@ -152,6 +153,7 @@ has %.type-map =
     'varbit'       => Str,
     '_varbit'      => Array[Str],
     'numeric'      => Num,
+    'void'         => Any,
     'uuid'         => Str,
     '_uuid'        => Array[Str],
     'jsonb'        => Str,
@@ -163,7 +165,6 @@ method add-oid(*@oid-map)
     for @oid-map -> Pair (:key($oid), :value($type))
     {
         %!oid-map{$oid} = $type;
-        %!oid-map{"_$oid"} = Array[$type];
     }
 }
 
@@ -177,14 +178,12 @@ method add-type(*%type-map)
 
 multi method type(Int:D $oid)
 {
-    die "Unknown oid $oid" unless %!oid-map{$oid}:exists;
-    self.type(%!oid-map{$oid})
+    self.type(%!oid-map{$oid} // 'unknown')
 }
 
 multi method type(Str:D $type)
 {
-    die "Uknown type $type" unless %!type-map{$type}:exists;
-    %!type-map{$type}
+    %!type-map{$type}:exists ?? %!type-map{$type} !! Str
 }
 
 multi method convert(Int:D $oid, Mu:D $value)
