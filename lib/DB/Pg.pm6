@@ -194,6 +194,15 @@ B<:conninfo> is any valid L<PostgreSQL connection
 Usually something like this:
 
  'postgresql:///mydb?host=localhost&port=5433'
+
+or this:
+
+ 'host=localhost port=5432 dbname=mydb connect_timeout=10'
+
+or, if you put the connection info in .pg_service.conf (you should)
+
+ 'service=foo'
+
 =end item
 
 =begin item
