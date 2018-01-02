@@ -2,11 +2,11 @@ use epoll;
 
 use DB::Pg::Native;
 use DB::Pg::Database;
-use DB::Pg::TypeConverter;
-use DB::Pg::TypeConverter::DateTime;
-use DB::Pg::TypeConverter::Geometric;
-use DB::Pg::TypeConverter::JSON;
-use DB::Pg::TypeConverter::UUID;
+use DB::Pg::Converter;
+use DB::Pg::Converter::DateTime;
+use DB::Pg::Converter::Geometric;
+use DB::Pg::Converter::JSON;
+use DB::Pg::Converter::UUID;
 
 class DB::Pg
 {
@@ -14,7 +14,7 @@ class DB::Pg
     has $.max-connections = 5;
     has @.converters = <DateTime JSON UUID Geometric>;
 
-    has DB::Pg::TypeConverter $.converter .= new;
+    has DB::Pg::Converter $.converter .= new;
 
     has @.connections;
     has $!connection-lock = Lock.new;
@@ -26,7 +26,7 @@ class DB::Pg
 
     submethod TWEAK
     {
-        $!converter does DB::Pg::TypeConverter::{$_} for @!converters;
+        $!converter does DB::Pg::Converter::{$_} for @!converters;
     }
 
     method db(--> DB::Pg::Database)
@@ -228,7 +228,7 @@ arguments, then returns the database to the pool.
 If the query returns results, retuns a C<DB::Pg::Results> object with
 the results.
 
-=head2 B<execute>(Str $sql)
+=head2 B<execute>(Str:D $sql)
 
 Allocates a database connection, executes the SQL statement, then
 returns the database to the pool.

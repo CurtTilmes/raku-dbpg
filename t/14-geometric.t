@@ -5,13 +5,13 @@ use Test::When <extended>;
 
 use DB::Pg;
 use DB::Pg::GeometricTypes;
-use DB::Pg::TypeConverter::Geometric;
+use DB::Pg::Converter::Geometric;
 
 plan 7;
 
 my $pg = DB::Pg.new;
 
-$pg.converter does DB::Pg::TypeConverter::Geometric;
+$pg.converter does DB::Pg::Converter::Geometric;
 
 is-deeply $pg.query(Q<select '(1,2e43)'::point>).value,
     Point.new(x => 1e0, y => 2e43), 'Point';

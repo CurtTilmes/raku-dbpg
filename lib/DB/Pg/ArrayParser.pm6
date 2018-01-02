@@ -1,6 +1,7 @@
 use v6;
 
-grammar DB::Pg::ArrayParser {
+grammar DB::Pg::ArrayParser
+{
     rule TOP         { ^ <array> $ }
 
     rule array       { '{' ~ '}' <element>+ % ',' }

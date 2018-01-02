@@ -3,7 +3,7 @@ use DB::Pg::GeometricTypes;
 my regex float { <[+-]>? \d+ ['.' \d+]? [ <[eE]> <[+-]>?  \d+ ]? }
 my regex point { '(' <x=float> ',' <y=float> ')' }
 
-role DB::Pg::TypeConverter::Geometric
+role DB::Pg::Converter::Geometric
 {
     submethod BUILD
     {

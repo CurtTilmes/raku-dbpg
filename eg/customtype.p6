@@ -1,6 +1,6 @@
 #!/usr/bin/env perl6
 
-use DB::Pg::TypeConverter;
+use DB::Pg::Converter;
 
 use LibUUID;
 
@@ -12,7 +12,7 @@ role UUIDConverter
 
 }
 
-my $converter = DB::Pg::TypeConverter.new does UUIDConverter;
+my $converter = DB::Pg::Converter.new does UUIDConverter;
 
 my $res = $converter.convert(2950, '5c64e2cf-1750-41c9-a73d-720a78029510');
 

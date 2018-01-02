@@ -322,7 +322,7 @@ $pg.notify('foo', 'a message');
 Type Conversions
 ----------------
 
-The `DB::Pg::TypeConverter` object is used to convert between
+The `DB::Pg::Converter` object is used to convert between
 PostgreSQL types and Perl types.  It has two maps, one from
 [oid](https://www.postgresql.org/docs/current/static/datatype-oid.html)
 types to PostgreSQL type names, and one from the type names to Perl
@@ -331,7 +331,7 @@ types.
 For example, the oid `23` maps to the PostgreSQL type `int` which maps
 to the Perl type `Int`.
 
-`DB::Pg::TypeConverter` has a multiple dispatch method `convert()`
+`DB::Pg::Converter` has a multiple dispatch method `convert()`
 that is used to convert types.
 
 Extra roles can be mixed in to the default converter to enable it to
@@ -368,8 +368,8 @@ method that results in a suitable string for PostgreSQL (often the
 case), the second method can be omitted.  (Or if you are only reading
 a type from the database, and never passing it to the server.)
 
-Several TypeConverters are bundled with this module, and by default
-they are added to the TypeConverter automatically:
+Several Converters are bundled with this module, and by default
+they are added to the Converter automatically:
 
 * DateTime (date, timestamp, timestamptz -> Date, DateTime)
 * JSON (json, jsonb)

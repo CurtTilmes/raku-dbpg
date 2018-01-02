@@ -2,7 +2,7 @@ use JSON::Fast;
 
 my class JSON {}
 
-role DB::Pg::TypeConverter::JSON
+role DB::Pg::Converter::JSON
 {
     submethod BUILD { self.add-type(json => JSON, jsonb => JSON) }
 

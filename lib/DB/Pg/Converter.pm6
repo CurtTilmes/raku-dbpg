@@ -2,7 +2,7 @@ use NativeCall;
 use DB::Pg::Native;
 use DB::Pg::ArrayParser;
 
-unit class DB::Pg::TypeConverter;
+unit class DB::Pg::Converter;
 
 has %.oid-map =
     16    => 'bool',
@@ -263,3 +263,15 @@ method convert-params(@args, @paramtypes, :$db)
 
     @params
 }
+
+=begin pod
+
+=head1 NAME
+
+DB::Pg::Converter -- Convert between PostgreSQL and Perl objects
+
+=head1 SYNOPSIS
+
+
+
+=end pod

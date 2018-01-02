@@ -219,3 +219,32 @@ class DB::Pg::CopyOutIterator does Iterator
         }
     }
 }
+
+=begin pod
+
+=head1 NAME
+
+DB::Pg::Native -- NativeCall interactions with libpq
+
+=head1 SYNOPSIS
+
+  my $pgconn = PGconn.new($conninfo);
+
+  say $pgconn.status; # CONNECTION_OK or CONNECTION_BAD
+
+  say $pgconn.error-message;
+
+  $pgconn.finish;
+
+=head1 DESCRIPTION
+
+See the PostgreSQL docs:
+https://www.postgresql.org/docs/current/static/libpq.html
+
+=head2 PGconn
+
+=head2 PGresult
+
+=head2 PGnotify
+
+=end pod

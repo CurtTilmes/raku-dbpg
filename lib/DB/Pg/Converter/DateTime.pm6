@@ -1,4 +1,4 @@
-role DB::Pg::TypeConverter::DateTime
+role DB::Pg::Converter::DateTime
 {
     submethod BUILD
     {

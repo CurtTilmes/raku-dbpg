@@ -3,12 +3,12 @@ use v6;
 use Test;
 use Test::When <extended>;
 
-use DB::Pg::TypeConverter;
+use DB::Pg::Converter;
 use DB::Pg::ArrayParser;
 
 plan 11;
 
-my $converter = DB::Pg::TypeConverter.new;
+my $converter = DB::Pg::Converter.new;
 
 sub parseit($type, $str)
 {
