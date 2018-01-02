@@ -272,6 +272,41 @@ DB::Pg::Converter -- Convert between PostgreSQL and Perl objects
 
 =head1 SYNOPSIS
 
+  my $c = DB::Pg::Converter.new;
 
+  # Convert value from PostgreSQL type to a Perl type:
+
+  my $perl = $c.convert(Bool:U, 't');  # True
+
+  # You can also use the PostgreSQL string for the type:
+
+  my $perl = $c.convert('bool', 't');  # True
+
+  # Convert from Perl to the PostgreSQL type:
+
+  say $c.convert(False, Bool:U);  # 'f'
+
+  # Add other types by adding roles to the Converter:
+
+  role UUIDConverter
+  {
+      submethod BUILD { self.add-type(uuid => UUID) }
+      multi method convert(UUID:U, $value) { UUID.new: $value }
+  }
+
+  $converter does UUIDConverter;
+
+  # Note, UUIDs already stringify correctly, so you don't need to add this:
+
+      multi method convert(UUID:D $value, UUID:U) { ~$value }
+
+=head1 SYNOPSIS
+
+The converter object is used to convert types between PostgreSQL and
+Perl.
+
+It mainly has a bunch of multi method convert()s with various types.
+You can easily add more types by mixing in additional roles for custom
+types.
 
 =end pod
