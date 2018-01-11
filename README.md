@@ -388,6 +388,9 @@ my $pg = DB::Pg.new(converters => <DateTime JSON>)
 If you want a different type of conversion than those canned types,
 just exclude the default one and install your own as above.
 
+Note: I'm looking for better ways to arrange this -- comments (file an
+issue) welcome!
+
 Arrays
 ------
 
@@ -400,6 +403,12 @@ Exceptions
 
 All database errors, including broken SQL queries, are thrown as exceptions.
 
+NOTE
+----
+
+For now, I've got the async pub/stuff using epoll, which is Linux
+specific, so this is tied to Linux.  Patches welcome!
+
 Acknowledgements
 ----------------
 
@@ -411,9 +420,11 @@ Mojolicious project.
 License
 -------
 
+See [NASA Open Source Agreement](../master/NASA_Open_Source_Agreement_1.3%20GSC-18031.pdf) for more details.
 
 Copyright
 ---------
+
 Copyright © 2017 United States Government as represented by the
 Administrator of the National Aeronautics and Space Administration.
 No copyright is claimed in the United States under Title 17,
