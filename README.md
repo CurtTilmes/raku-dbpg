@@ -31,18 +31,18 @@ DBIish, go ahead.. I don't mind.
 Basic usage
 -----------
 
-```
+```perl6
 my $pg = DB::Pg.new;  # You can pass in connection information if you want.
 ```
 
 Execute a query, and get a single value:
-```
+```perl6
 say $pg.query('select 42').value;
 # 42
 ```
 
 Insert some values using placeholders:
-```
+```perl6
 $pg.query('insert into foo (x,y) values ($1,$2)', 1, 'this');
 ```
 
@@ -51,13 +51,13 @@ Note, placeholders use the `$1, $2, ...` syntax instead of `?` See
 for more information.
 
 Execute a query returning a row as an array or hash;
-```
+```perl6
 say $pg.query('select * from foo where x = $1', 42).array;
 say $pg.query('select * from foo where x = $1', 42).hash;
 ```
 
 Execute a query returning a bunch of rows as arrays or hashes:
-```
+```perl6
 .say for $pg.query('select * from foo').arrays;
 .say for $pg.query('select * from foo').hashes;
 ```
@@ -65,7 +65,7 @@ Execute a query returning a bunch of rows as arrays or hashes:
 If you have no placeholders/arguments and aren't retrieving
 information, you can use `execute`.  It does not `PREPARE` the query.
 
-```
+```perl6
 $pg.execute('insert into foo (x,y) values (1,2)');
 ```
 
@@ -88,10 +88,19 @@ another.
 For example, you can perform database actions while iterating through
 results from a query:
 
-```
+```perl6
 for $pg.query('select * from foo').hashes -> %h
 {
     $pg.query('update bar set ... where x = $1...$2...', %h<x>, %h<y>);
+}
+```
+
+You can even do arbitrary queries in multiple threads without worrying
+about connections:
+
+```perl6
+say await do for ^10 {
+    start $pg.query('select $1::int, pg_sleep($1::float/10)', $_).value
 }
 ```
 
@@ -132,7 +141,7 @@ object directly:
 
 For example:
 
-```
+```perl6
 my $results = $pg.query('select * from foo');
 
 say $results.rows;
@@ -157,11 +166,11 @@ You must explicitly do that after use.
 
 These are equivalent:
 
-```
+```perl6
 .say for $pg.query('select * from foo').arrays;
 ```
 
-```
+```perl6
 my $db = $pg.db;
 .say for $db.query('select * from foo').arrays;
 $db.finish;
@@ -170,7 +179,7 @@ $db.finish;
 The database object also has some extra methods for separately
 preparing and executing a query:
 
-```
+```perl6
 my $db = $pg.db;
 my $sth = $db.prepare('insert into foo (x,y) values ($1,$2)');
 $sth.execute(1, 'this');
@@ -190,7 +199,7 @@ Transactions
 The database object can also manage transactions with the `.begin`,
 `.commit` and `.rollback` methods.
 
-```
+```perl6
 my $db = $pg.db;
 my $sth = $db.prepare('insert into foo (x,y) values ($1,$2)');
 $db.begin;
@@ -224,7 +233,7 @@ whole query to execute, and the memory for all the
 results. [Cursors](https://www.postgresql.org/docs/10/static/plpgsql-cursors.html)
 provide a better way.
 
-```
+```perl6
 for $pg.cursor('select * from foo where x = $1', 27) -> @row
 {
     say @row;
@@ -236,7 +245,7 @@ be controlled with the `:fetch` parameter, defaults to 1,000).  The
 `:hash` parameter can be used to retrieve hashes for the rows instead
 of arrays.
 
-```
+```perl6
 for $pg.cursor('select * from foo', fetch => 500, :hash) -> %r
 {
     say %r;
@@ -254,7 +263,7 @@ This is accessed with the `DB::Pg::Database` methods `.copy-data` and
 `.copy-end`.  Pass blocks of data in with `.copy-data`, and call
 `.copy-end` when complete.
 
-```
+```perl6
 my $db = $pg.db;
 $db.query('copy foo from stdin (format csv)'); # Any valid COPY command
 $db.copy-data("1,2\n4,5\n6,12\n")
@@ -266,7 +275,7 @@ As a convenience, these methods return the database object, so they
 can easily be chained (though you will probably loop the `copy-data`
 call.)
 
-```
+```perl6
 $pg.db.execute('copy foo from stdin').copy-data("1 2\n12 34234\n").copy-end.finish;
 ```
 
@@ -276,7 +285,7 @@ Bulk Copy Out
 Bulk copy out can performed too, a COPY command will return a sequence
 from an iterator which will return each line:
 
-```
+```perl6
 for $pg.query('copy foo to stdout (format csv)') -> $line
 {
     print $line;
@@ -293,7 +302,7 @@ The `.listen()` method returns a supply that can be used within a
 `react` block.  You can listen to multiple channels, and all listens
 will share the same database connection.
 
-```
+```perl6
 react {
     whenever $pg.listen('foo') -> $msg
     {
@@ -309,13 +318,13 @@ react {
 Use `.unlisten` to stop listening to a specific channel.  When the
 last listened supply is unlistened, the react block will exit.
 
-```
+```perl6
 $pg.unlisten('foo')
 ```
 
 PostgreSQL notifications can be sent with the `.notify` method:
 
-```
+```perl6
 $pg.notify('foo', 'a message');
 ```
 
@@ -344,7 +353,7 @@ conversion methods.
 Here is a short example that causes the PostgreSQL 'json' and 'jsonb'
 types to be converted automatically.
 
-```
+```perl6
 use DB::Pg;
 use JSON::Fast;
 
@@ -381,7 +390,7 @@ The Geometric types are available in `DB::Pg::GeometricTypes`.
 If you *don't* want any of those converters, just pass in an empty
 `converters` array, or with just the ones you want:
 
-```
+```perl6
 my $pg = DB::Pg.new(converters => <DateTime JSON>)
 ```
 
