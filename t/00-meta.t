@@ -1,5 +1,3 @@
-use v6;
-
 use Test;
 use Test::When <author>;
 use Test::META;

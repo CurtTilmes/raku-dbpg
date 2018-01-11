@@ -1,5 +1,3 @@
-use v6;
-
 grammar DB::Pg::ArrayParser
 {
     rule TOP         { ^ <array> $ }
