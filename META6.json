@@ -35,7 +35,7 @@
         "DB::Pg" : "lib/DB/Pg.pm6"
     },
 
-    "depends" : [ "NativeCall" ],
+    "depends" : [ "NativeCall", "LibUUID", "epoll" ],
 
     "description" : "Perl6 bindings for PostgreSQL",
 
