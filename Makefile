@@ -6,8 +6,10 @@ check:
 	git diff-index --check HEAD
 	prove6
 
-dist:
+tag:
 	git tag $(VERSION)
 	git push origin --tags
+
+dist:
 	git archive --prefix=$(ARCHIVENAME)-$(VERSION)/ \
-	-o ../$(ARCHIVENAME)-$(VERSION).tar.gz HEAD
+		-o ../$(ARCHIVENAME)-$(VERSION).tar.gz $(VERSION)
