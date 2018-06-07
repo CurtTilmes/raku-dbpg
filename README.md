@@ -10,6 +10,16 @@ Basic usage
 ```perl6
 my $pg = DB::Pg.new;  # You can pass in connection information if you want.
 ```
+# Example of passing connection information. Thanks to https://gist.github.com/jnthn
+# See https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING for more on connection information
+```perl6
+my $conninfo = join " ",
+        ('dbname=' ~ (%*ENV<DB_NAME> || die("missing DB_NAME in environemnt"))),
+        ("host=$_" with %*ENV<DB_HOST>),
+        ("user=$_" with %*ENV<DB_USER>),
+        ("password=$_" with %*ENV<DB_PASSWORD>);
+my $db = Database.new(:$conninfo, :converters<DateTime>);
+```
 
 Execute a query, and get a single value:
 ```perl6
