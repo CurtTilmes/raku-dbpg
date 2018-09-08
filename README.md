@@ -63,7 +63,7 @@ string](https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-
 For example:
 
 ```
-my $pg = DB::Pg.new('host=myhost port=5432 dbname=mydb');
+my $pg = DB::Pg.new(conninfo => 'host=myhost port=5432 dbname=mydb');
 ```
 
 You could also pull those from environment variables with something like this:
@@ -84,10 +84,7 @@ Service
 File](https://www.postgresql.org/docs/10/static/libpq-pgservice.html)
 and just use a conninfo string like "service=foo".
 
-This is the same as just setting environment variable `PGSERVICE=foo`, then
-```
-my $pg = DB::Pg.new;
-```
+This is the same as just setting environment variable `PGSERVICE=foo`.
 
 Connection Caching
 ------------------
