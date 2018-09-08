@@ -30,7 +30,7 @@ is $pg.query("select 't'::bool").value, True, 'value bool';
 
 is $pg.query('select $1::bool', False).value, False, 'value bool placeholder';
 
-is $pg.query('select null').value, Any, 'Null';
+ok $pg.query('select null').value ~~ Any, 'Null';
 
 is $pg.query('select $1::text', Str).value, Str, 'Null String placeholder';
 
