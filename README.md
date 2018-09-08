@@ -10,16 +10,6 @@ Basic usage
 ```perl6
 my $pg = DB::Pg.new;  # You can pass in connection information if you want.
 ```
-# Example of passing connection information. Thanks to https://gist.github.com/jnthn
-# See https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING for more on connection information
-```perl6
-my $conninfo = join " ",
-        ('dbname=' ~ (%*ENV<DB_NAME> || die("missing DB_NAME in environemnt"))),
-        ("host=$_" with %*ENV<DB_HOST>),
-        ("user=$_" with %*ENV<DB_USER>),
-        ("password=$_" with %*ENV<DB_PASSWORD>);
-my $db = Database.new(:$conninfo, :converters<DateTime>);
-```
 
 Execute a query, and get a single value:
 ```perl6
@@ -53,6 +43,50 @@ information, you can use `execute`.  It does not `PREPARE` the query.
 
 ```perl6
 $pg.execute('insert into foo (x,y) values (1,2)');
+```
+
+Connection Information
+----------------------
+
+The most basic connection is just to pass in no options:
+
+```
+my $pg = DB::Pg.new;
+```
+
+This is similar to just running `psql` on the command line.  It will
+take advantage of any of the standard postgres environment variables.
+
+You can also construct a standard [libpq connect
+string](https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING). and pass it in.
+
+For example:
+
+```
+my $pg = DB::Pg.new('host=myhost port=5432 dbname=mydb');
+```
+
+You could also pull those from environment variables with something like this:
+
+```perl6
+my $conninfo = join " ",
+        ('dbname=' ~ (%*ENV<DB_NAME> || die("missing DB_NAME in environment"))),
+        ("host=$_" with %*ENV<DB_HOST>),
+        ("user=$_" with %*ENV<DB_USER>),
+        ("password=$_" with %*ENV<DB_PASSWORD>);
+my $db = DB::Pg.new(:$conninfo);
+```
+
+But you might as well use the standard `PG*` environment variables.
+
+You can also just put all your connection information in a [Connection
+Service
+File](https://www.postgresql.org/docs/10/static/libpq-pgservice.html)
+and just use a conninfo string like "service=foo".
+
+This is the same as just setting environment variable `PGSERVICE=foo`, then
+```
+my $pg = DB::Pg.new;
 ```
 
 Connection Caching
