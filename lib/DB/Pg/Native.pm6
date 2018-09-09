@@ -1,6 +1,6 @@
 use NativeCall;
 
-constant LIBPQ = 'pq';  # libpq.so
+my constant LIBPQ = 'pq';  # libpq.so
 
 enum ConnStatusType <
     CONNECTION_OK
@@ -77,6 +77,12 @@ class PGresult is repr('CPointer')
 
     method format(int32 $column_number --> int32)
         is native(LIBPQ) is symbol('PQfformat') {}
+
+    method command-status(--> Str)
+        is native(LIBPQ) is symbol('PQcmdStatus') {}
+
+    method command-tuples(--> Str)
+        is native(LIBPQ) is symbol('PQcmdTuples') {}
 }
 
 class PGnotify is repr('CStruct')

@@ -168,6 +168,10 @@ say $results.types;
 .say for $results.hashes;
 ```
 
+If the query isn't a select or otherwise doesn't return data, such as
+an INSERT, UPDATE, or DELETE, it will return the number of rows
+affected.
+
 Database
 --------
 

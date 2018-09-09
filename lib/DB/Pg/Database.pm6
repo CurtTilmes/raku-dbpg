@@ -217,7 +217,7 @@ class DB::Pg::Database
             CATCH
             {
                 when DB::Pg::Error::EmptyQuery | DB::Pg::Error::FatalError
-                 {
+                {
                      self.finish if $finish;
                      .throw;
                 }

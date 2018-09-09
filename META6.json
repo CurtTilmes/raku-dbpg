@@ -1,7 +1,7 @@
 {
     "name" : "DB::Pg",
 
-    "version" : "0.3",
+    "version" : "0.4",
 
     "source-url" : "https://github.com/CurtTilmes/perl6-dbpg.git",
 

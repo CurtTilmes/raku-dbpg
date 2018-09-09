@@ -8,6 +8,8 @@ class DB::Pg::Statement
     has @.paramtypes;
     has @.columns;
     has @.types;
+    has $.command-status;
+    has $.command-tuples;
 
     method execute(**@args, Bool :$finish = False, Bool :$decode = True)
     {
@@ -36,9 +38,11 @@ class DB::Pg::Statement
                 }
                 when PGRES_COMMAND_OK
                 {
+                    $!command-status = $result.command-status;
+                    $!command-tuples = $result.command-tuples;
                     $result.clear;
                     self.finish if $finish;
-                    $!db
+                    +$!command-tuples
                 }
                 when PGRES_COPY_IN
                 {
@@ -108,5 +112,8 @@ copy data will be decoded and returned as Strs instead of Blobs
 
 If :finish is True, the database connection will C<finish> following
 the execution and retrieval of results.
+
+If the database does not return tuple results, it will return the
+number of rows affected by the query.
 
 =end pod
