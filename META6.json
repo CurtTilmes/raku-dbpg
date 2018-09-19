@@ -5,9 +5,9 @@
 
     "source-url" : "https://github.com/CurtTilmes/perl6-dbpg.git",
 
-    "perl" : "6.c",
+    "perl" : "6.*",
 
-    "tags" : [ "DATABASE" ],
+    "tags" : [ "DATABASE", "POSTGRESQL" ],
 
     "provides" : {
         "DB::Pg::ArrayParser" : "lib/DB/Pg/ArrayParser.pm6",
