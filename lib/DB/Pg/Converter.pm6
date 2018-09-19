@@ -237,7 +237,8 @@ multi method convert(@value, Array:U $type)
     '{' ~
         @value.map(
             {
-                when Array   { self.convert($_,$type) }
+                when Mu:U { 'NULL' }
+                when Positional { self.convert($_,$type) }
                 when Numeric { $_ }
                 default
                 {
