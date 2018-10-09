@@ -20,9 +20,50 @@ enum ExecStatusType <
     PGRES_SINGLE_TUPLE
 >;
 
+enum ResultErrorField (
+    PG_DIAG_SEVERITY              => ord('S'),
+    PG_DIAG_SEVERITY_NONLOCALIZED => ord('V'),
+    PG_DIAG_SQLSTATE              => ord('C'),
+    PG_DIAG_MESSAGE_PRIMARY       => ord('M'),
+    PG_DIAG_MESSAGE_DETAIL        => ord('D'),
+    PG_DIAG_MESSAGE_HINT          => ord('H'),
+    PG_DIAG_STATEMENT_POSITION    => ord('P'),
+    PG_DIAG_INTERNAL_POSITION     => ord('p'),
+    PG_DIAG_INTERNAL_QUERY        => ord('q'),
+    PG_DIAG_CONTEXT               => ord('W'),
+    PG_DIAG_SCHEMA_NAME           => ord('s'),
+    PG_DIAG_TABLE_NAME            => ord('t'),
+    PG_DIAG_COLUMN_NAME           => ord('c'),
+    PG_DIAG_DATATYPE_NAME         => ord('d'),
+    PG_DIAG_CONSTRAINT_NAME       => ord('n'),
+    PG_DIAG_SOURCE_FILE           => ord('F'),
+    PG_DIAG_SOURCE_LINE           => ord('L'),
+    PG_DIAG_SOURCE_FUNCTION       => ord('R'),
+);
+
 class DB::Pg::Error is Exception
 {
-    has $.message;
+    has Str $.message;
+    has Str $.message-detail;
+    has Str $.message-hint;
+	has Str $.context;
+	has Str $.type;
+	has Str $.type-localized;
+	has Str $.state;
+
+	has Str $.statement-position;
+	has Str $.internal-position;
+	has Str $.internal-query;
+
+	has Str $.schema;
+	has Str $.table;
+	has Str $.column;
+	has Str $.datatype;
+	has Str $.constraint;
+
+	has Str $.source-file;
+	has Str $.source-line;
+	has Str $.source-function;
 }
 
 class DB::Pg::Error::EmptyQuery    is DB::Pg::Error {}
@@ -44,6 +85,9 @@ class PGresult is repr('CPointer')
 
     method error-message(--> Str) is native(LIBPQ)
         is symbol('PQresultErrorMessage') {}
+
+    method error-field(int32 $field_number --> Str) is native(LIBPQ)
+        is symbol('PQresultErrorField') { }
 
     method clear() is native(LIBPQ)
         is symbol('PQclear') {}
@@ -220,7 +264,7 @@ class DB::Pg::CopyOutIterator does Iterator
             }
             when -2     # Error
             {
-                die DB::Pg::Error(message => $!db.conn.error-message);
+                die DB::Pg::Error(message => $!db.conn.error-message, state => 'S8006');
             }
         }
     }

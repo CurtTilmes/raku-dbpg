@@ -120,15 +120,41 @@ class DB::Pg::Database
                 die DB::Pg::Error::EmptyQuery.new(message => 'Empty Query')
             }
             when PGRES_FATAL_ERROR {
-                $result.clear;
                 die DB::Pg::Error::FatalError.new(
-                    message => $!conn.error-message)
+                    message => $result.error-field(PG_DIAG_MESSAGE_PRIMARY),
+                    message-detail => $result.error-field(PG_DIAG_MESSAGE_DETAIL),
+                    message-hint => $result.error-field(PG_DIAG_MESSAGE_HINT),
+                    context => $result.error-field(PG_DIAG_CONTEXT),
+                    type => $result.error-field(PG_DIAG_SEVERITY_NONLOCALIZED),
+                    type-localized => $result.error-field(PG_DIAG_SEVERITY),
+                    state => $result.error-field(PG_DIAG_SQLSTATE),
+
+                    statement-position => $result.error-field(PG_DIAG_STATEMENT_POSITION),
+                    internal-position => $result.error-field(PG_DIAG_INTERNAL_POSITION),
+                    internal-query => $result.error-field(PG_DIAG_INTERNAL_QUERY),
+
+                    schema => $result.error-field(PG_DIAG_SCHEMA_NAME),
+                    table => $result.error-field(PG_DIAG_TABLE_NAME),
+                    column => $result.error-field(PG_DIAG_COLUMN_NAME),
+                    datatype => $result.error-field(PG_DIAG_DATATYPE_NAME),
+                    constraint => $result.error-field(PG_DIAG_CONSTRAINT_NAME),
+
+                    source-file => $result.error-field(PG_DIAG_SOURCE_FILE),
+                    source-line => $result.error-field(PG_DIAG_SOURCE_LINE),
+                    source-function => $result.error-field(PG_DIAG_SOURCE_FUNCTION),
+                );
+                $result.clear;
             }
             when PGRES_COMMAND_OK|PGRES_TUPLES_OK|PGRES_COPY_OUT|PGRES_COPY_IN {
                 $result
             }
             default {...}
         }
+    }
+
+    method error-field(PGresult:D $result, ResultErrorField:D $field-name)
+    {
+		return $result.error-field($result, $field-name);
     }
 
     method prepare(Str:D $query --> DB::Pg::Statement)
