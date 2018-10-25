@@ -433,6 +433,30 @@ Exceptions
 
 All database errors, including broken SQL queries, are thrown as exceptions.
 
+Exceptions for a query result may have additional fields as reported by PostgreSQL with the mapping below (perl exception field ➡ PostgreSQL field name):
+
+* message ➡ PG_DIAG_MESSAGE_PRIMARY
+* message-detail ➡ PG_DIAG_MESSAGE_DETAIL
+* message-hint ➡ PG_DIAG_MESSAGE_HINT
+* context ➡ PG_DIAG_CONTEXT
+* type ➡ PG_DIAG_SEVERITY_NONLOCALIZED
+* type-localized ➡ PG_DIAG_SEVERITY
+* state ➡ PG_DIAG_SQLSTATE
+* statement-position ➡ PG_DIAG_STATEMENT_POSITION
+* internal-position ➡ PG_DIAG_INTERNAL_POSITION
+* internal-query ➡ PG_DIAG_INTERNAL_QUERY
+* schema ➡ PG_DIAG_SCHEMA_NAME
+* table ➡ PG_DIAG_TABLE_NAME
+* column ➡ PG_DIAG_COLUMN_NAME
+* datatype ➡ PG_DIAG_DATATYPE_NAME
+* constraint ➡ PG_DIAG_CONSTRAINT_NAME
+* source-file ➡ PG_DIAG_SOURCE_FILE
+* source-line ➡ PG_DIAG_SOURCE_LINE
+* source-function ➡ PG_DIAG_SOURCE_FUNCTION
+
+Please see the [PostgreSQL documentation](https://www.postgresql.org/docs/current/static/libpq-exec.html#LIBPQ-PQRESULTERRORFIELD)
+for a detailed description of what each field contains.
+
 NOTE
 ----
 
