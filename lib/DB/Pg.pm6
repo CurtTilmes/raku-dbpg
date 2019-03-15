@@ -1,5 +1,3 @@
-use epoll;
-
 use DB::Pg::Native;
 use DB::Pg::Database;
 use DB::Pg::Converter;
@@ -8,12 +6,13 @@ use DB::Pg::Converter::Geometric;
 use DB::Pg::Converter::JSON;
 use DB::Pg::Converter::UUID;
 
+try require ::('epoll');
+
 class DB::Pg
 {
     has $.conninfo = '';
     has $.max-connections = 5;
     has @.converters = <DateTime JSON UUID Geometric>;
-
     has DB::Pg::Converter $.converter .= new;
 
     has @.connections;
@@ -98,7 +97,7 @@ class DB::Pg
     method !listen-loop
     {
         $!listen-db = self.db;
-        my $epoll = epoll.new.add($!listen-db.conn.socket, :in);
+        my $epoll = ::('epoll').new.add($!listen-db.conn.socket, :in);
         start
         {
             loop
@@ -122,6 +121,7 @@ class DB::Pg
     method listen(Str:D $channel)
     {
         return $_ with %!suppliers{$channel};
+        die "Must install epoll to use listen()" if ::('epoll') ~~ Failure;
         $!supplier-lock.protect: { %!suppliers{$channel} = Supplier.new }
         $!listen-db-lock.protect: { self!listen-loop unless $!listen-db }
         $!listen-db.execute("listen $channel");
