@@ -3,9 +3,12 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-#plan 8;
+plan 24;
 
 my $pg = DB::Pg.new;
+
+try $pg.listen('tryit');
+exit skip-rest "no epoll" if $!;
 
 my @foo;
 my @bar;

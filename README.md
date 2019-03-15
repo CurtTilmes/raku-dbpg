@@ -349,6 +349,9 @@ PostgreSQL notifications can be sent with the `.notify` method:
 $pg.notify('foo', 'a message');
 ```
 
+For now, `listen()` requires the `epoll` module to be installed, and
+will `die` if it isn't installed.
+
 Type Conversions
 ----------------
 

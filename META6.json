@@ -1,7 +1,7 @@
 {
     "name" : "DB::Pg",
 
-    "version" : "0.5",
+    "version" : "0.6",
 
     "source-url" : "https://github.com/CurtTilmes/perl6-dbpg.git",
 
@@ -35,7 +35,7 @@
         "DB::Pg" : "lib/DB/Pg.pm6"
     },
 
-    "depends" : [ "NativeCall", "LibUUID", "epoll" ],
+    "depends" : [ "NativeCall", "LibUUID", "JSON::Fast" ],
 
     "description" : "Perl6 bindings for PostgreSQL",
 
