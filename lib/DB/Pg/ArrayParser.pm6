@@ -2,7 +2,7 @@ grammar DB::Pg::ArrayParser
 {
     rule TOP         { ^ <array> $ }
 
-    rule array       { '{' ~ '}' <element>+ % ',' }
+    rule array       { '{' ~ '}' <element>* % ',' }
 
     rule element     { <array> | <string> | <quoted> | <null> }
 

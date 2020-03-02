@@ -4,7 +4,7 @@ use Test::When <extended>;
 use DB::Pg::Converter;
 use DB::Pg::ArrayParser;
 
-plan 11;
+plan 12;
 
 my $converter = DB::Pg::Converter.new;
 
@@ -38,5 +38,7 @@ is-deeply parseit(Str, Q'{ "this\\that" }'), ['this\that'], 'embedded backslash'
 is-deeply parseit(Int, '{ NULL, 7, NULL }'), [Int, 7, Int], 'Int nulls';
 
 is-deeply parseit(Str, '{ NULL, 7, NULL }'), [Str, '7', Str], 'Str nulls';
+
+is-deeply parseit(Str, '{ }'), [], 'empty array';
 
 done-testing;
