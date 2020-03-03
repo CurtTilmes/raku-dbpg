@@ -411,6 +411,16 @@ they are added to the Converter automatically:
 
 The Geometric types are available in `DB::Pg::GeometricTypes`.
 
+The `DateTime` converter relies on the PostgreSQL `datestyle`
+configuration.  It must be set to a style compatible with Raku to be
+able to convert.  In particular, some legacy styles still use 2 digit
+year representations that are impossible to unambiguosly map to a
+specific date.  It is recommended that you set `datestyle` to 'iso'.
+This can either be done for the whole server (in `postgresql.conf`, or
+'alter database <some database> set datestyle iso'), or per client
+(with 'set datestyle to iso' or by setting environment variable
+`PGDATESTYLE` to `iso`).
+
 If you *don't* want any of those converters, just pass in an empty
 `converters` array, or with just the ones you want:
 
