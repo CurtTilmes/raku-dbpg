@@ -1,6 +1,7 @@
-use NativeCall;
+use NativeLibs:ver<0.0.7+>:auth<github:salortiz>;
 
-my constant LIBPQ = 'pq';  # libpq.so
+my constant LIBPQ = NativeLibs::Searcher.at-runtime('pq', 'PQstatus', 5);
+
 
 enum ConnStatusType <
     CONNECTION_OK
