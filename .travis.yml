@@ -1,0 +1,8 @@
+language:
+  - minimal
+
+services:
+  - docker
+
+script:
+  - make test
