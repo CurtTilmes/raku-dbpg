@@ -1,6 +1,6 @@
 use NativeCall;
 
-my constant LIBPQ = 'pq';  # libpq.so
+my constant LIBPQ = 'pq', v5;  # libpq.so
 
 enum ConnStatusType <
     CONNECTION_OK
