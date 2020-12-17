@@ -1,52 +1,46 @@
 {
-    "name" : "DB::Pg",
-
-    "version" : "0.6",
-
-    "source-url" : "https://github.com/CurtTilmes/perl6-dbpg.git",
-
-    "perl" : "6.*",
-
-    "tags" : [ "DATABASE", "POSTGRESQL" ],
-
-    "provides" : {
-        "DB::Pg::ArrayParser" : "lib/DB/Pg/ArrayParser.pm6",
-
-        "DB::Pg::Database" : "lib/DB/Pg/Database.pm6",
-
-        "DB::Pg::GeometricTypes" : "lib/DB/Pg/GeometricTypes.pm6",
-
-        "DB::Pg::Native" : "lib/DB/Pg/Native.pm6",
-
-        "DB::Pg::Results" : "lib/DB/Pg/Results.pm6",
-
-        "DB::Pg::Statement" : "lib/DB/Pg/Statement.pm6",
-
-        "DB::Pg::Converter" : "lib/DB/Pg/Converter.pm6",
-
-        "DB::Pg::Converter::DateTime" : "lib/DB/Pg/Converter/DateTime.pm6",
-
-        "DB::Pg::Converter::Geometric" : "lib/DB/Pg/Converter/Geometric.pm6",
-
-        "DB::Pg::Converter::JSON" : "lib/DB/Pg/Converter/JSON.pm6",
-
-        "DB::Pg::Converter::UUID" : "lib/DB/Pg/Converter/UUID.pm6",
-
-        "DB::Pg" : "lib/DB/Pg.pm6"
+    "meta-version"     : "1",
+    "perl"             : "6.d",
+    "name"             : "DB::Pg",
+    "api"              : "1",
+    "version"          : "1.0",
+    "auth"             : "github:CurtTilmes",
+    "description"      : "Raku bindings for PostgreSQL",
+    "authors"          : [ "Curt Tilmes <Curt.Tilmes@nasa.gov>" ],
+    "license"          : "NASA-1.3",
+    "test-depends"     : [ "Test", "Test::When" ],
+    "depends"        : {
+        "runtime": {
+            "requires": [
+                "NativeCall",
+                "NativeLibs:ver<0.0.7+>:auth<github:salortiz>",
+                "LibUUID",
+                "JSON::Fast",
+                "pq:from<native>:ver<5>"
+             ]
+        },
+        "test": {
+            "requires": [ "Test", "Test::When" ]
+        }
     },
-
-    "depends" : [ "NativeCall", "LibUUID", "JSON::Fast" ],
-
-    "description" : "Perl6 bindings for PostgreSQL",
-
-    "test-depends" : [ "Test", "Test::When", "Test::META" ],
-
-    "license" : "NASA-1.3",
-
-    "authors" : [ "Curt Tilmes <Curt.Tilmes@nasa.gov>" ],
-
+    "provides" : {
+        "DB::Pg::ArrayParser"          : "lib/DB/Pg/ArrayParser.rakumod",
+        "DB::Pg::Database"             : "lib/DB/Pg/Database.rakumod",
+        "DB::Pg::GeometricTypes"       : "lib/DB/Pg/GeometricTypes.rakumod",
+        "DB::Pg::Native"               : "lib/DB/Pg/Native.rakumod",
+        "DB::Pg::Results"              : "lib/DB/Pg/Results.rakumod",
+        "DB::Pg::Statement"            : "lib/DB/Pg/Statement.rakumod",
+        "DB::Pg::Converter"            : "lib/DB/Pg/Converter.rakumod",
+        "DB::Pg::Converter::DateTime"  : "lib/DB/Pg/Converter/DateTime.rakumod",
+        "DB::Pg::Converter::Geometric" : "lib/DB/Pg/Converter/Geometric.rakumod",
+        "DB::Pg::Converter::JSON"      : "lib/DB/Pg/Converter/JSON.rakumod",
+        "DB::Pg::Converter::UUID"      : "lib/DB/Pg/Converter/UUID.rakumod",
+        "DB::Pg"                       : "lib/DB/Pg.rakumod"
+    },
+    "tags" : [ "DATABASE", "POSTGRESQL" ],
     "support" : {
-      "source" : "https://github.com/CurtTilmes/perl6-dbpg.git",
-      "bugtracker" : "https://github.com/CurtTilmes/perl6-dbpg/issues"
+        "email" : "Curt.Tilmes@nasa.gov",
+        "source" : "https://github.com/CurtTilmes/raku-dbpg.git",
+        "bugtracker" : "https://github.com/CurtTilmes/raku-dbpg.git"
     }
 }
