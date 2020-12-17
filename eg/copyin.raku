@@ -1,4 +1,4 @@
-#!/usr/bin/env perl6
+#!/usr/bin/env raku
 
 use DB::Pg;
 
@@ -13,6 +13,5 @@ $db.copy-data("7234,23423\n234234234,963453\n").copy-end;
 say $db.query("select * from foo").hashes;
 
 $db.finish;
-
 
 say $pg.connections.elems;

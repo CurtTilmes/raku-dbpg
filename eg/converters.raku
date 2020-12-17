@@ -1,7 +1,6 @@
-#!/usr/bin/env perl6
+#!/usr/bin/env raku
 
 use DB::Pg;
-
 
 my $pg = DB::Pg.new(converters => <DateTime>);
 
