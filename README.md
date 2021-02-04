@@ -50,7 +50,7 @@ Connection Information
 
 The most basic connection is just to pass in no options:
 
-```
+```perl6
 my $pg = DB::Pg.new;
 ```
 
@@ -62,7 +62,7 @@ string](https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-
 
 For example:
 
-```
+```perl6
 my $pg = DB::Pg.new(conninfo => 'host=myhost port=5432 dbname=mydb');
 ```
 
