@@ -4,6 +4,8 @@ DB::Pg – PostgreSQL access for Perl 6
 This is a reimplementation of Perl 6 bindings for PostgreSQL's
 [libpq](https://www.postgresql.org/docs/current/static/libpq.html).
 
+A very nice overview article is available in a blog post by Luca Ferrari: [A glance at Raku connectivity towards PostgreSQL](https://fluca1978.github.io/2021/03/29/RakuPostgreSQL.html).
+
 Basic usage
 -----------
 
