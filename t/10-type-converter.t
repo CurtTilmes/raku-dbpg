@@ -8,6 +8,9 @@ ok my $c = DB::Pg::Converter.new, 'new converter';
 is $c.convert('bool', 't'), True, 'bool t';
 is $c.convert('bool', 'f'), False, 'bool f';
 
+is $c.convert([ 'th"is' ], Array[Str]),
+    Q<{"th\"is"}>, 'array with quote';
+
 is $c.convert([ Q<th\is> ], Array[Str]),
     Q<{"th\\is"}>, 'array with embedded backslash';
 

@@ -243,8 +243,8 @@ multi method convert(@value, Array:U $type)
                 default
                 {
                     '"' ~
-                        .subst(/\"/, '\\"', :g)
                         .subst(/\\/, Q<\\>, :g)
+                        .subst(/\"/, '\\"', :g)
                     ~ '"'
                 }
             }).join(',')
