@@ -85,6 +85,12 @@ class DB::Pg::Results
         Seq.new: DB::Pg::ArrayIterator.new(res => self, :$!finish, :hash,
                                            rows => self.rows)
     }
+
+    method col-array(Int $col = 0)
+    {
+        LEAVE $.finish if $!finish;
+        (^$.rows).map({ $.row($_)[$col] }).Array
+    }
 }
 
 =begin pod
@@ -112,6 +118,8 @@ DB::Pg::Results -- Results from a PostgreSQL query
  say $results.arrays;   # A sequence of arrays with all rows
 
  say $results.hashes;   # A sequence of hashes with all rows
+
+ say $results.col-array;    # A single array of one column.
 
  $results.finish        # Only needed if results aren't consumed.
 
@@ -162,5 +170,9 @@ Returns a sequence of all rows as arrays.
 =head2 B<hashes>()
 
 Returns a sequence of all rows as hashes.
+
+=head2 B<col-array>(Int $col = 0)
+
+Retrieves a specific column from the results as an array.
 
 =end pod
