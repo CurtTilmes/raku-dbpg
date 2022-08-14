@@ -3,7 +3,7 @@ use Test::When <extended>;
 
 use DB::Pg;
 
-plan 4;
+plan 6;
 
 my $pg = DB::Pg.new;
 
@@ -16,5 +16,11 @@ is-deeply $pg.query('select generate_series(1,5) as x').hashes,
 is-deeply $pg.query('select generate_series(1,0)').arrays, (), 'No arrays';
 
 is-deeply $pg.query('select generate_series(1,0)').hashes, (), 'No hashes';
+
+is-deeply $pg.query('select generate_series(1,5)').col-array,
+    [1..5], 'col-array';
+
+is-deeply $pg.query('select 123, generate_series(1,5)').col-array(1),
+    [1..5], 'col-array(1)';
 
 done-testing;
